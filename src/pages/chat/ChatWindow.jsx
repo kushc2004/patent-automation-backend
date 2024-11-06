@@ -1,0 +1,622 @@
+// ChatWindow.jsx
+
+import React, { useState, useRef, useEffect } from 'react';
+import Message from '../../components/chat/Message';
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+import axios from 'axios';
+import ReactQuill from 'react-quill';
+import 'react-quill/dist/quill.snow.css';
+import DOMPurify from 'dompurify';
+
+const { GoogleGenerativeAI } = require("@google/generative-ai");
+
+// Template for generating prompts
+const prompt_template = `
+You are an expert in Legal Assistance and your job is to analyse the User's case and respond to queries by the user. Your name is Legal AI, and assume yourself as an Legal Assistant.
+
+Refer to the Chat History if required.
+
+**IMPORTANT NOTE**
+1. You should respond in simple text format. 
+2. You should use proper line breaks and formatting, use <li>, <b>, <br> tags for formatting.
+
+Below is the user query:
+{user_query}
+
+Now answer the user query:
+`;
+
+// Client function to interact with Gemini API
+const client = async (prompt, history) => {
+    const apiKey = "YOUR_API_KEY_HERE"; // Replace with your actual API key
+    if (!apiKey) {
+        throw new Error("Gemini API key is not set.");
+    }
+
+    const genAI = new GoogleGenerativeAI(apiKey);
+
+    const model = genAI.getGenerativeModel({
+        model: "gemini-1.5-flash-002",
+    });
+
+    const generationConfig = {
+        temperature: 1,
+        topP: 0.95,
+        topK: 40,
+        maxOutputTokens: 8192,
+        responseMimeType: "text/plain",
+    };
+
+    const chatSession = model.startChat({
+        generationConfig,
+        history: history
+            .filter(msg => msg.text.trim() !== "") // Filter out any messages with empty text
+            .map(msg => ({
+                role: msg.sender === 'user' ? 'user' : 'model',
+                parts: msg.text
+                    .split('\n')
+                    .filter(part => part.trim() !== "") // Filter out empty lines within each message
+                    .map(part => ({ text: part }))
+            }))
+    });
+
+    console.log(history.map(msg => ({
+        role: msg.sender === 'user' ? 'user' : 'model',
+        parts: msg.text.split('\n').map(part => ({ text: part }))
+    })));
+
+    console.log("prompt: ", prompt);
+
+    const result = await chatSession.sendMessage(prompt);
+
+    console.log(result);
+    return result.response.candidates[0].content.parts[0].text;
+};
+
+const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, activeChat }) => {
+    const initialHistory = [
+        { text: "Hello! I am your legal assistant AI. Please select 'For' or 'Against' for an opinion.", sender: 'model' }
+    ];
+
+    const [messages, setMessages] = useState(initialHistory);
+    const [opinionDirection, setOpinionDirection] = useState(null);
+    const [editMode, setEditMode] = useState(false);
+    const [editContent, setEditContent] = useState('');
+    const [editReferences, setEditReferences] = useState([]);
+    const [editPlaceholders, setEditPlaceholders] = useState({});
+    const chatContainerRef = useRef(null);
+    const [sessionData, setSessionData] = useState({});
+    const [caseRef, setCaseRef] = useState([]);
+    const [caseTexts, setCaseTexts] = useState({});
+    const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+    const [inputMessage, setInputMessage] = useState('');
+    const [fileUrls, setFileUrls] = useState({});
+    const [isTyping, setIsTyping] = useState(false);
+
+    useEffect(() => {
+        if (chatContainerRef.current) {
+            chatContainerRef.current.scrollIntoView({ behavior: 'smooth' });
+        }
+    }, [messages, isHistoryOpen]);
+
+    useEffect(() => {
+        const storedData = JSON.parse(sessionStorage.getItem("caseFormData")) || {};
+        setSessionData(storedData);
+    }, []);
+
+    useEffect(() => {
+        if (activeChat && activeChat.messages) {
+            setMessages(activeChat.messages);
+        } else {
+            setMessages(initialHistory);
+        }
+    }, [activeChat]);
+
+    // Helper function to strip HTML tags and get plain text
+    const stripHtml = (html) => {
+        const tmp = document.createElement("DIV");
+        tmp.innerHTML = html;
+        return tmp.textContent || tmp.innerText || "";
+    };
+
+    // Helper function to extract references from HTML content
+    const extractReferences = (html) => {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        const spans = doc.querySelectorAll('span.reference-badge');
+        const references = [];
+
+        spans.forEach(span => {
+            if (span.getAttribute('data-ref-case')) {
+                references.push({
+                    type: 'case',
+                    id: span.getAttribute('data-ref-case'),
+                    text: span.innerText
+                });
+            }
+            if (span.getAttribute('data-ref-code')) {
+                references.push({
+                    type: 'code',
+                    act: span.getAttribute('data-ref-code'),
+                    section: span.getAttribute('data-ref-section'),
+                    text: span.innerText
+                });
+            }
+        });
+
+        return references;
+    };
+
+    // Helper function to replace references with placeholders
+    const replaceReferencesWithPlaceholders = (text, references) => {
+        let placeholderMap = {};
+        let modifiedText = text;
+        references.forEach((ref, index) => {
+            const placeholder = `[[ref${index}]]`;
+            placeholderMap[placeholder] = ref;
+            const regex = new RegExp(`<span[^>]*>${ref.text}</span>`, 'g');
+            modifiedText = modifiedText.replace(regex, placeholder);
+        });
+        return { modifiedText, placeholderMap };
+    };
+
+    // Helper function to replace placeholders with references
+    const replacePlaceholdersWithReferences = (text, placeholderMap) => {
+        let modifiedText = text;
+        Object.keys(placeholderMap).forEach(placeholder => {
+            const ref = placeholderMap[placeholder];
+            if (ref.type === 'case') {
+                modifiedText = modifiedText.replace(placeholder, `<span data-ref-case="${ref.id}" class="reference-badge" style="cursor:pointer;color:blue;">${ref.text}</span>`);
+            }
+            if (ref.type === 'code') {
+                modifiedText = modifiedText.replace(placeholder, `<span data-ref-code="${ref.act}" data-ref-section="${ref.section}" class="reference-badge" style="cursor:pointer;color:blue;">${ref.text}</span>`);
+            }
+        });
+        return modifiedText;
+    };
+
+    // Enter edit mode by extracting plain text and references
+    const enterEditMode = () => {
+        const latestBotMessage = messages.slice().reverse().find((msg) => msg.sender === 'model');
+        if (latestBotMessage) {
+            const plainText = stripHtml(latestBotMessage.text);
+            const references = extractReferences(latestBotMessage.text);
+            const { modifiedText, placeholderMap } = replaceReferencesWithPlaceholders(latestBotMessage.text, references);
+            setEditContent(modifiedText);
+            setEditReferences(references); // Store references
+            setEditPlaceholders(placeholderMap);
+            setEditMode(true);
+            setIsDocumentCollapsed(true);
+        }
+    };
+
+    // Save edited message by reinserting references
+    const saveEdit = () => {
+        const updatedTextWithPlaceholders = editContent;
+        const updatedText = replacePlaceholdersWithReferences(updatedTextWithPlaceholders, editPlaceholders);
+        setMessages((prev) => {
+            const messagesCopy = [...prev];
+            const lastBotIndex = messagesCopy.map(msg => msg.sender).lastIndexOf('model');
+
+            if (lastBotIndex !== -1) {
+                messagesCopy[lastBotIndex] = { ...messagesCopy[lastBotIndex], text: updatedText };
+            }
+
+            return messagesCopy;
+        });
+        setEditMode(false);
+        setIsDocumentCollapsed(false);
+
+        // Update activeChat if necessary
+        if (activeChat) {
+            setActiveChat(prev => ({
+                ...prev,
+                messages: messages.map(msg => msg.sender === 'model' ? 
+                    (msg.text === initialHistory[0].text ? msg : 
+                        { ...msg, text: msg.text === updatedText ? updatedText : msg.text }
+                    ) : msg
+                )
+            }));
+        }
+    };
+
+    // Automatically save chat history when messages change
+    useEffect(() => {
+        if (activeChat) {
+            // Save the active chat automatically whenever messages change
+            const saveChat = async () => {
+                try {
+                    const response = await axios.post('http://127.0.0.1:5000/api/save_chat_history', {
+                        chat_history: activeChat.messages,
+                        chat_title: activeChat.title
+                    }, {
+                        withCredentials: true,
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    });
+
+                    if (response.data.message) {
+                        toast.success("Chat history saved successfully.");
+                        // Optionally, refresh chat histories
+                    } else {
+                        throw new Error(response.data.error || "Unknown error");
+                    }
+                } catch (error) {
+                    console.error("Error saving chat history:", error.message);
+                    toast.error("Error saving chat history.");
+                }
+            };
+
+            saveChat();
+        }
+    }, [messages, activeChat]);
+
+    const handleOpinionSelection = async (direction) => {
+        setOpinionDirection(direction);
+        const userMessage = `I would like an opinion ${direction === 'for' ? 'in favor' : 'against'} the case.`;
+        setMessages((prev) => [
+            ...prev,
+            { text: userMessage, sender: 'user' },
+            { text: `Generating opinion ${direction === 'for' ? 'in favor' : 'against'} the case...`, sender: 'model' },
+        ]);
+
+        try {
+            const data = {
+                query: sessionData.facts,
+                category: sessionData.category,
+                status: sessionData.caseState,
+                opinion_direction: direction,
+            };
+
+            const textresponse = await axios.post('http://127.0.0.1:5000/api/generate_opinion', data, {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                },
+                withCredentials: true,
+            });
+
+            const response = JSON.parse(textresponse.data.opinion);
+            console.log(response);
+
+            const refCases = response.ref_case || {};
+            setCaseRef(refCases);
+
+            if (Object.keys(refCases).length > 0) {
+                const texts = await Promise.all(Object.keys(refCases).map(id => fetchCaseText(id, refCases[id])));
+                const caseTextMap = Object.keys(refCases).reduce((acc, id, index) => {
+                    acc[id] = texts[index];
+                    return acc;
+                }, {});
+                setCaseTexts(caseTextMap);
+            } else {
+                setCaseTexts({});
+            }
+
+            const processedOpinion = replaceTagsWithLinks(response.opinion, refCases); // Pass refCases as argument
+            setMessages((prev) => [
+                ...prev,
+                { text: processedOpinion, sender: 'model' },
+            ]);
+
+            // Update activeChat if necessary
+            if (activeChat) {
+                setActiveChat(prev => ({
+                    ...prev,
+                    messages: [...prev.messages, { text: processedOpinion, sender: 'model' }]
+                }));
+            }
+
+        } catch (error) {
+            console.error("Error:", error.message);
+            toast.error("Error generating opinion. Please try again.");
+        }
+    };
+
+    const fetchCaseText = async (caseId, highlightIndexes) => {
+        try {
+            const response = await axios.get(`http://127.0.0.1:5000/fetch-case-text/${caseId}`);
+            const caseText = response.data;
+
+            // Split the text into paragraphs and add highlighting for specific indexes
+            const paragraphs = caseText.paragraphs.map((para, index) =>
+                highlightIndexes.includes(index) ? `<span style="background-color: #f9f9128a;">${para}</span>` : para
+            );
+
+            return paragraphs.join('\n\n');
+        } catch (error) {
+            console.error("Error fetching case text:", error);
+            return `Could not retrieve case text for ${caseId}.`;
+        }
+    };
+
+    const fetchCodeText = async (act, section) => {
+        try {
+            const response = await axios.get(`http://127.0.0.1:5000/fetch-code-text/${act}/${section.split('(')[0]}`);
+            return response.data.content;
+        } catch (error) {
+            console.error("Error fetching code text:", error);
+            return `Could not retrieve text for ${act}, Section ${section}.`;
+        }
+    };
+
+    const replaceTagsWithLinks = (opinionText, caseRef) => {
+        const caseIds = Object.keys(caseRef);
+        
+        return opinionText
+            .replace(/<case_id:(\w+)>/g, (match, caseId) => {
+                const caseIndex = caseIds.indexOf(caseId) !== -1 ? caseIds.indexOf(caseId) + 1 : '?';
+                return `<span data-ref-case="${caseId}" class="reference-badge" style="cursor:pointer;color:blue;">‎ Case ${caseIndex}</span>`;
+            })
+            .replace(/<code:(\w+):([\w()]+)>/g, (match, act, section) => {
+                return `<span data-ref-code="${act}" data-ref-section="${section}" class="reference-badge" style="cursor:pointer;color:blue;">‎ ${act} Section:${section}</span>`;
+            });
+    };
+
+    // Function to Handle Reference Clicks
+    const handleReferenceClick = ({ type, id, act, section }) => {
+        if (type === 'case') {
+            openCaseOverlay(caseTexts[id] || "Could not retrieve case text.");
+        } else if (type === 'code') {
+            fetchCodeText(act, section).then(content => {
+                openCaseOverlay(content);
+            });
+        }
+    };
+
+    // Function to Handle Reference Clicks from Messages
+    const onReferenceClick = ({ type, id, act, section }) => {
+        handleReferenceClick({ type, id, act, section });
+    };
+
+    // sendMessage function
+    const sendMessage = async (e) => {
+        e.preventDefault();
+        if (inputMessage.trim() === '') return;
+
+        const newMessage = { text: inputMessage, sender: 'user' };
+        setMessages((prev) => [
+            ...prev,
+            newMessage,
+        ]);
+        setInputMessage('');
+
+        setIsTyping(true);
+
+        try {
+            const filteredHistory = messages.filter(
+                (msg) => msg.text !== "Hello! I am your legal assistant AI. Please select 'For' or 'Against' for an opinion."
+            );
+            const prompt = prompt_template.replace('{user_query}', inputMessage);
+            const aiResponse = await client(prompt, filteredHistory);
+            console.log("gemini response: ", aiResponse);
+            // const processedResponse = replaceTagsWithLinks(aiResponse);
+            if (aiResponse) {
+                const botMessage = { text: aiResponse, sender: 'model' };
+                setMessages((prev) => [
+                    ...prev,
+                    botMessage,
+                ]);
+
+                // Update activeChat if it's already set
+                if (activeChat) {
+                    setActiveChat({
+                        ...activeChat,
+                        messages: [...activeChat.messages, botMessage]
+                    });
+                }
+            } else {
+                throw new Error("Received empty response from the model.");
+            }
+        } catch (error) {
+            console.error("Error sending message:", error);
+            toast.error("Error sending message. Please try again.");
+        } finally {
+            setIsTyping(false);
+        }
+    };
+
+    return (
+        <div
+            className={`flex flex-col h-full bg-[#EFF3F6] shadow-lg rounded-3xl overflow-hidden
+                ${
+                    setIsDocumentCollapsed ? 'w-full' : 'w-3/4'
+                }
+                `}
+            style={{
+                backgroundImage: 'url("assets/img/bg-dots.svg")',
+                backgroundSize: 'contain',
+                backgroundPosition: 'center',
+                backgroundRepeat: 'no-repeat',
+            }}
+        >
+            <ToastContainer />
+
+            {/* Edit Button */}
+            {!editMode && (
+                <button onClick={enterEditMode} className="w-1/6 self-end m-4 text-gray-700 hover:text-gray-700 rounded-full bg-white py-2">
+                    ✏️ Edit Opinion
+                </button>
+            )}
+
+            {/* Opinion Selection Buttons */}
+            <div className="w-1/4 flex justify-start px-4 py-2 -mt-16">
+                <button
+                    onClick={() => handleOpinionSelection(opinionDirection === 'for' ? 'against' : 'for')}
+                    className="flex items-center px-4 py-2 w-32 bg-gray-700 rounded-full font-semibold transition duration-200"
+                >
+                    <div
+                        className={`flex items-center justify-center w-6 h-6 rounded-full bg-white transition-all duration-200 ${
+                            opinionDirection === 'for' ? 'translate-x-4' : 'translate-x-0'
+                        }`}
+                    ></div>
+                    <span
+                        className={`ml-2 transition-all duration-200 text-white ${
+                            opinionDirection === 'for' ? 'order-first' : 'order-last'
+                        } text-gray-700`}
+                    >
+                        {opinionDirection === 'for' ? 'In Favor' : 'Against'}
+                    </span>
+                </button>
+            </div>
+
+            {/* Main Chat Area */}
+            <div className="flex-1 flex overflow-hidden">
+                {/* Chat History Sidebar */}
+                {/* {isHistoryOpen && (
+                    <div className="w-1/3 bg-white border-r border-gray-200 p-4 overflow-y-auto">
+                        <h2 className="text-xl font-bold mb-4">Chat Histories</h2>
+                        {chatHistories.length > 0 ? (
+                            <ul className="space-y-4">
+                                {chatHistories.map(history => (
+                                    <li
+                                        key={history.id}
+                                        className="flex items-center p-4 bg-white border border-gray-200 rounded-lg shadow-md hover:shadow-lg transition duration-300 ease-in-out cursor-pointer"
+                                        onClick={() => loadChatHistory(history)}
+                                    >
+                                        <div className="mr-4 text-blue-500">
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10m-5 4v6m-1-6h.01" />
+                                            </svg>
+                                        </div>
+                                        <div>
+                                            <span className="text-gray-700 font-semibold">{history.title}</span>
+                                            <p className="text-gray-500 text-sm">{new Date(history.timestamp).toLocaleString()}</p>
+                                        </div>
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : (
+                            <p className="text-gray-500 text-center">No chat histories available</p>
+                        )}
+                    </div>
+                )} */}
+
+                {/* Message Area */}
+                <div className={`p-4 flex-1 overflow-y-auto ${isHistoryOpen ? 'w-2/3' : 'w-full'} transition-all duration-300`}>
+                    <div className="flex flex-col space-y-4">
+                        {messages.map((msg, index) => (
+                            <Message
+                                key={index}
+                                message={msg.text}
+                                sender={msg.sender}
+                                onReferenceClick={onReferenceClick}
+                            />
+                        ))}
+                        <div ref={chatContainerRef} />
+                    </div>
+                    {isTyping && (
+                        <div className="flex justify-start">
+                            <div className="bg-gray-50 text-gray-900 rounded-xl shadow-lg px-4 py-2 inline-block">
+                                <div className="flex space-x-1">
+                                    <span className="w-2 h-2 bg-gray-800 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                                    <span className="w-2 h-2 bg-gray-900 rounded-full animate-bounce" style={{ animationDelay: '200ms' }}></span>
+                                    <span className="w-2 h-2 bg-gray-900 rounded-full animate-bounce" style={{ animationDelay: '400ms' }}></span>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* Edit Mode Overlay */}
+                {editMode && (
+                    <div className="flex flex-col w-1/2 bg-white p-4 shadow-lg transition-all duration-300 overflow-y-auto">
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-lg font-bold">Edit Message</h3>
+                            <button
+                                onClick={() => {
+                                    setEditMode(false);
+                                    setIsDocumentCollapsed(false);
+                                }}
+                                className="text-gray-600 hover:text-gray-800 ml-auto text-xl font-semibold mr-2"
+                            >
+                                &times;
+                            </button>
+                        </div>
+
+                        <ReactQuill
+                            theme="snow"
+                            value={editContent}
+                            onChange={setEditContent}
+                            modules={{
+                                toolbar: [
+                                    ['bold', 'italic', 'underline', 'strike'],
+                                    ['link', 'blockquote', 'code-block'],
+                                    [{ 'header': 1 }, { 'header': 2 }],
+                                    [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+                                    [{ 'align': [] }],
+                                    ['clean']
+                                ],
+                            }}
+                            formats={[
+                                'header',
+                                'bold', 'italic', 'underline', 'strike',
+                                'link', 'blockquote', 'code-block',
+                                'list', 'bullet', 'align'
+                            ]}
+                            className="h-3/5"
+                        />
+                        <button
+                            onClick={saveEdit}
+                            className="relative mt-4 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition duration-200"
+                        >
+                            Save
+                        </button>
+                    </div>
+                )}
+            </div>
+
+            {/* Chat Input Area */}
+            <div className="flex items-center px-4 py-2 space-x-3 bg-gray-100">
+                {/* Left Section: Chat History Button */}
+                <button
+                    onClick={() => setIsHistoryOpen(!isHistoryOpen)}
+                    className="bg-gray-700 rounded-full flex items-center justify-center text-white hover:bg-blue-600 transition duration-200 p-2"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.364 9.364 0 01-4.255-.949L3 20l1.651-4.301A8.962 8.962 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                    </svg>
+                </button>
+
+                {/* Middle Section: Chat Input */}
+                <form onSubmit={sendMessage} className="flex items-center space-x-4 bg-white px-4 py-2 rounded-full flex-1 shadow-inner">
+                    <span className="text-gray-500 text-sm">{Object.keys(fileUrls).length} Files</span>
+
+                    <input
+                        type="text"
+                        value={inputMessage}
+                        onChange={(e) => setInputMessage(e.target.value)}
+                        placeholder="Type your message here..."
+                        className="flex-1 bg-transparent outline-none text-gray-700 placeholder-gray-400"
+                    />
+
+                    {/* Send Button */}
+                    <button
+                        type="submit"
+                        className="bg-gray-700 rounded-full flex items-center justify-center text-white hover:bg-blue-600 transition duration-200 p-2"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                        </svg>
+                    </button>
+                </form>
+
+                {/* Right Section: Insurebuzz Guide */}
+                <div className="flex items-center py-2 rounded-full">
+                    <div className='flex items-center px-3 py-2 m-auto rounded-full bg-gray-50 shadow-inner'>
+                        <svg className="w-6 h-6 text-gray-700" fill="currentColor" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+                            <title>asterisk</title>
+                            <path d="M28.5 22.35l-10.999-6.35 10.999-6.351c0.231-0.131 0.385-0.375 0.385-0.655 0-0.414-0.336-0.75-0.75-0.75-0.142 0-0.275 0.040-0.388 0.108l0.003-0.002-11 6.35v-12.701c0-0.414-0.336-0.75-0.75-0.75s-0.75 0.336-0.75 0.75v0 12.7l-10.999-6.35c-0.11-0.067-0.243-0.106-0.385-0.106-0.414 0-0.75 0.336-0.75 0.75 0 0.28 0.154 0.524 0.381 0.653l0.004 0.002 10.999 6.351-10.999 6.35c-0.226 0.132-0.375 0.374-0.375 0.65 0 0.415 0.336 0.751 0.751 0.751 0 0 0 0 0.001 0h-0c0.138-0.001 0.266-0.037 0.378-0.102l-0.004 0.002 10.999-6.351v12.7c0 0.414 0.336 0.75 0.75 0.75s0.75-0.336 0.75-0.75v0-12.701l11 6.351c0.107 0.063 0.237 0.1 0.374 0.1 0.277 0 0.518-0.149 0.649-0.371l0.002-0.004c0.063-0.108 0.1-0.237 0.1-0.375 0-0.277-0.15-0.518-0.372-0.648l-0.004-0.002z"></path>
+                        </svg>
+
+                        <h2 className='mx-2 text-gray-700 font-semibold'>Guide</h2>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+    export default ChatWindow;
+
