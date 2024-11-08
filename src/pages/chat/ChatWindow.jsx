@@ -344,7 +344,9 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
     // Function to Handle Reference Clicks
     const handleReferenceClick = ({ type, id, act, section }) => {
         if (type === 'case') {
-            openCaseOverlay(caseTexts[id] || "Could not retrieve case text.");
+            fetchCaseText(id, refCases[id]).then(caseTexts => {
+                openCaseOverlay(caseTexts[id] || "Could not retrieve case text.");
+            }); 
         } else if (type === 'code') {
             fetchCodeText(act, section).then(content => {
                 openCaseOverlay(content);
