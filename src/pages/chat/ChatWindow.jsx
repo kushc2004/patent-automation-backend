@@ -19,7 +19,22 @@ Refer to the Chat History if required.
 
 **IMPORTANT NOTE**
 1. You should respond in simple text format. 
-2. You should use proper line breaks and formatting, use <li>, <b>, <br> tags for formatting.
+2. You should use <li>, <b>, <br> tags for formatting instead of new line character and *, ** tags.
+3. You should always answer according to rules and regulations of India and should always include referencing to backup your statements.
+4. You should include the following tags in your opinion whenever you are referring to anything (so that the backend can process this and create reference badges).
+        <code:code_name:section_number>: Example: In the Criminal Penal Code Section 17 <code:crpc:17> this means it is referring to section 17 of CrPC.
+        Example acts/codes: <code:hma:17> this means section 17 of Hindu Marriage Act.
+        <code:dva:23> this means section 23 of Domestic Violence Act.
+        <code:ipc:241> this means section 241 of India Penal Code
+
+        In case you want to refer to the whole Act, use section_number as 1 instead of NA.
+5. Use:
+    ipc for Indian Penal Code
+    crpc for Criminal Penal Code
+    dva for Domestic Violence Act
+    hma for Hindu Marriage Act
+    ida for Indian Divorce Act
+    ../ and so on
 
 Below is the user query:
 {user_query}
@@ -29,7 +44,7 @@ Now answer the user query:
 
 // Client function to interact with Gemini API
 const client = async (prompt, history) => {
-    const apiKey = "YOUR_API_KEY_HERE"; // Replace with your actual API key
+    const apiKey = "AIzaSyBSbMTaBPs5qD13ZBLuyQvvH4MNmOAyG9E"; // Replace with your actual API key
     if (!apiKey) {
         throw new Error("Gemini API key is not set.");
     }
@@ -89,16 +104,16 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
     const [sessionData, setSessionData] = useState({});
     const [caseRef, setCaseRef] = useState([]);
     const [caseTexts, setCaseTexts] = useState({});
-    const [isHistoryOpen, setIsHistoryOpen] = useState(false);
     const [inputMessage, setInputMessage] = useState('');
     const [fileUrls, setFileUrls] = useState({});
     const [isTyping, setIsTyping] = useState(false);
+    const [showOpinionButtons, setShowOpinionButtons] = useState(true);
 
     useEffect(() => {
         if (chatContainerRef.current) {
             chatContainerRef.current.scrollIntoView({ behavior: 'smooth' });
         }
-    }, [messages, isHistoryOpen]);
+    }, [messages]);
 
     useEffect(() => {
         const storedData = JSON.parse(sessionStorage.getItem("caseFormData")) || {};
@@ -221,40 +236,11 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
         }
     };
 
-    // Automatically save chat history when messages change
-    useEffect(() => {
-        if (activeChat) {
-            // Save the active chat automatically whenever messages change
-            const saveChat = async () => {
-                try {
-                    const response = await axios.post('http://127.0.0.1:5000/api/save_chat_history', {
-                        chat_history: activeChat.messages,
-                        chat_title: activeChat.title
-                    }, {
-                        withCredentials: true,
-                        headers: {
-                            'Content-Type': 'application/json'
-                        }
-                    });
-
-                    if (response.data.message) {
-                        toast.success("Chat history saved successfully.");
-                        // Optionally, refresh chat histories
-                    } else {
-                        throw new Error(response.data.error || "Unknown error");
-                    }
-                } catch (error) {
-                    console.error("Error saving chat history:", error.message);
-                    toast.error("Error saving chat history.");
-                }
-            };
-
-            saveChat();
-        }
-    }, [messages, activeChat]);
+    // Removed the automatic save useEffect
 
     const handleOpinionSelection = async (direction) => {
         setOpinionDirection(direction);
+        setShowOpinionButtons(false);  // Hide buttons after selection
         const userMessage = `I would like an opinion ${direction === 'for' ? 'in favor' : 'against'} the case.`;
         setMessages((prev) => [
             ...prev,
@@ -270,7 +256,7 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
                 opinion_direction: direction,
             };
 
-            const textresponse = await axios.post('http://127.0.0.1:5000/api/generate_opinion', data, {
+            const textresponse = await axios.post('https://legalai-backend.onrender.com/api/generate_opinion', data, {
                 headers: {
                     'Content-Type': 'application/json',
                     'Accept': 'application/json',
@@ -317,7 +303,7 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
 
     const fetchCaseText = async (caseId, highlightIndexes) => {
         try {
-            const response = await axios.get(`http://127.0.0.1:5000/fetch-case-text/${caseId}`);
+            const response = await axios.get(`https://legalai-backend.onrender.com/fetch-case-text/${caseId}`);
             const caseText = response.data;
 
             // Split the text into paragraphs and add highlighting for specific indexes
@@ -334,7 +320,7 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
 
     const fetchCodeText = async (act, section) => {
         try {
-            const response = await axios.get(`http://127.0.0.1:5000/fetch-code-text/${act}/${section.split('(')[0]}`);
+            const response = await axios.get(`https://legalai-backend.onrender.com/fetch-code-text/${act}/${section.split('(')[0]}`);
             return response.data.content;
         } catch (error) {
             console.error("Error fetching code text:", error);
@@ -385,6 +371,14 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
 
         setIsTyping(true);
 
+        if (activeChat) {
+            setActiveChat((prevChat) => ({
+                ...prevChat,
+                messages: [...prevChat.messages, newMessage],
+            }));
+            setShowOpinionButtons(false);
+        }
+
         try {
             const filteredHistory = messages.filter(
                 (msg) => msg.text !== "Hello! I am your legal assistant AI. Please select 'For' or 'Against' for an opinion."
@@ -392,9 +386,9 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
             const prompt = prompt_template.replace('{user_query}', inputMessage);
             const aiResponse = await client(prompt, filteredHistory);
             console.log("gemini response: ", aiResponse);
-            // const processedResponse = replaceTagsWithLinks(aiResponse);
+            const processedResponse = replaceTagsWithLinks(aiResponse, {});
             if (aiResponse) {
-                const botMessage = { text: aiResponse, sender: 'model' };
+                const botMessage = { text: processedResponse, sender: 'model' };
                 setMessages((prev) => [
                     ...prev,
                     botMessage,
@@ -402,10 +396,10 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
 
                 // Update activeChat if it's already set
                 if (activeChat) {
-                    setActiveChat({
-                        ...activeChat,
-                        messages: [...activeChat.messages, botMessage]
-                    });
+                    setActiveChat((prevChat) => ({
+                        ...prevChat,
+                        messages: [...prevChat.messages, botMessage],
+                    }));
                 }
             } else {
                 throw new Error("Received empty response from the model.");
@@ -418,20 +412,48 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
         }
     };
 
+
+    const saveChat = async () => {
+        if (!messages || messages.length === 0) {
+            toast.error("No active chat to save.");
+            return;
+        }
+    
+        try {
+            const response = await axios.post('https://legalai-backend.onrender.com/api/save_chat_history', {
+                chat_history: messages,
+                chat_title: activeChat?.title || `Chat on ${new Date().toLocaleString()}`
+            }, {
+                withCredentials: true,
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+    
+            if (response.data.message) {
+                toast.success("Chat history saved successfully.");
+            } else {
+                throw new Error(response.data.error || "Unknown error");
+            }
+        } catch (error) {
+            console.error("Error saving chat history:", error.message);
+            toast.error("Error saving chat history.");
+        }
+    };
+
     return (
         <div
             className={`flex flex-col h-full bg-[#EFF3F6] shadow-lg rounded-3xl overflow-hidden
-                ${
-                    setIsDocumentCollapsed ? 'w-full' : 'w-3/4'
-                }
-                `}
+                ${setIsDocumentCollapsed ? 'w-full' : 'w-3/4'}
+            `}
             style={{
-                backgroundImage: 'url("assets/img/bg-dots.svg")',
+                backgroundImage: messages.length > 1 ? 'none' : 'url("assets/img/bg-dots.svg")',
                 backgroundSize: 'contain',
                 backgroundPosition: 'center',
                 backgroundRepeat: 'no-repeat',
             }}
         >
+
             <ToastContainer />
 
             {/* Edit Button */}
@@ -464,38 +486,8 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
 
             {/* Main Chat Area */}
             <div className="flex-1 flex overflow-hidden">
-                {/* Chat History Sidebar */}
-                {/* {isHistoryOpen && (
-                    <div className="w-1/3 bg-white border-r border-gray-200 p-4 overflow-y-auto">
-                        <h2 className="text-xl font-bold mb-4">Chat Histories</h2>
-                        {chatHistories.length > 0 ? (
-                            <ul className="space-y-4">
-                                {chatHistories.map(history => (
-                                    <li
-                                        key={history.id}
-                                        className="flex items-center p-4 bg-white border border-gray-200 rounded-lg shadow-md hover:shadow-lg transition duration-300 ease-in-out cursor-pointer"
-                                        onClick={() => loadChatHistory(history)}
-                                    >
-                                        <div className="mr-4 text-blue-500">
-                                            <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10m-5 4v6m-1-6h.01" />
-                                            </svg>
-                                        </div>
-                                        <div>
-                                            <span className="text-gray-700 font-semibold">{history.title}</span>
-                                            <p className="text-gray-500 text-sm">{new Date(history.timestamp).toLocaleString()}</p>
-                                        </div>
-                                    </li>
-                                ))}
-                            </ul>
-                        ) : (
-                            <p className="text-gray-500 text-center">No chat histories available</p>
-                        )}
-                    </div>
-                )} */}
-
                 {/* Message Area */}
-                <div className={`p-4 flex-1 overflow-y-auto ${isHistoryOpen ? 'w-2/3' : 'w-full'} transition-all duration-300`}>
+                <div className={`p-4 flex-1 overflow-y-auto transition-all duration-300`}>
                     <div className="flex flex-col space-y-4">
                         {messages.map((msg, index) => (
                             <Message
@@ -505,8 +497,25 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
                                 onReferenceClick={onReferenceClick}
                             />
                         ))}
+                        {!activeChat && showOpinionButtons && (
+                            <div className="relative flex justify-start space-x-4 mt-0 ml-8 -top-2">
+                                <button
+                                    onClick={() => handleOpinionSelection('for')}
+                                    className="px-4 py-2 bg-gray-700 text-white font-semibold rounded-lg hover:bg-green-600 transition"
+                                >
+                                    For
+                                </button>
+                                <button
+                                    onClick={() => handleOpinionSelection('against')}
+                                    className="px-4 py-2 bg-gray-700 text-white font-semibold rounded-lg hover:bg-red-600 transition"
+                                >
+                                    Against
+                                </button>
+                            </div>
+                        )}
                         <div ref={chatContainerRef} />
                     </div>
+                    
                     {isTyping && (
                         <div className="flex justify-start">
                             <div className="bg-gray-50 text-gray-900 rounded-xl shadow-lg px-4 py-2 inline-block">
@@ -570,15 +579,16 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
 
             {/* Chat Input Area */}
             <div className="flex items-center px-4 py-2 space-x-3 bg-gray-100">
-                {/* Left Section: Chat History Button */}
+                {/* Left Section: Save Chat Button */}
                 <button
-                    onClick={() => setIsHistoryOpen(!isHistoryOpen)}
+                    onClick={saveChat}
                     className="bg-gray-700 rounded-full flex items-center justify-center text-white hover:bg-blue-600 transition duration-200 p-2"
                 >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.364 9.364 0 01-4.255-.949L3 20l1.651-4.301A8.962 8.962 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M5 3a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V7.414a2 2 0 00-.586-1.414l-4-4A2 2 0 0014.586 2H5zm4 14a1 1 0 112 0 1 1 0 01-2 0zm0-4a1 1 0 012 0v3h2v-3a1 1 0 112 0v3h2v-5H9v5zM13 6V4h1.586L17 6.414V8h-4V6z"/>
                     </svg>
                 </button>
+
 
                 {/* Middle Section: Chat Input */}
                 <form onSubmit={sendMessage} className="flex items-center space-x-4 bg-white px-4 py-2 rounded-full flex-1 shadow-inner">
@@ -617,6 +627,5 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
             </div>
         </div>
     );
-};
-    export default ChatWindow;
-
+}
+export default ChatWindow;

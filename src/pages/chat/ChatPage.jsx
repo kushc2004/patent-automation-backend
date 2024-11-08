@@ -27,7 +27,7 @@ const ChatPage = () => {
 
             // Fetch Chat Histories from Backend
             try {
-                const response = await axios.get('http://127.0.0.1:5000/api/get_chat_histories', { withCredentials: true });
+                const response = await axios.get('https://legalai-backend.onrender.com/api/get_chat_histories', { withCredentials: true });
                 if (response.data.chat_histories) {
                     setChatHistories(response.data.chat_histories);
                 }

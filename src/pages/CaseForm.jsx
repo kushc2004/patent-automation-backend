@@ -1,52 +1,85 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import Papa from 'papaparse';
+
+
+const categoryOptions = ["Criminal", "Civil", "Family", "Corporate", "Others"];
+const caseStateOptions = ["Pending", "Pre-final", "Not started yet", "Other"];
+
+
 
 function CaseForm() {
     const navigate = useNavigate();
     const [name, setName] = useState('');
     const [state, setState] = useState('');
     const [city, setCity] = useState('');
+    const [customCity, setCustomCity] = useState('');
     const [category, setCategory] = useState('');
+    const [customCategory, setCustomCategory] = useState('');
     const [caseState, setCaseState] = useState('');
+    const [customCaseState, setCustomCaseState] = useState('');
     const [uploadedFiles, setUploadedFiles] = useState([]);
     const [facts, setFacts] = useState('');
     const [acceptedTerms, setAcceptedTerms] = useState(false);
     const [subscribe, setSubscribe] = useState(false);
+    const [statesWithCities, setStatesWithCities] = useState({});
 
-    const categoryOptions = ["Criminal", "Civil", "Family", "Corporate"];
-    const caseStateOptions = ["Pending", "Pre-final", "Not started yet", "Other"];
+    useEffect(() => {
+        const fetchCityStateData = async () => {
+            const response = await fetch('./india_database.csv');
+            const text = await response.text();
+    
+            Papa.parse(text, {
+                header: true,
+                skipEmptyLines: true,
+                complete: (result) => {
+                    const data = result.data;
+                    const stateCityMap = {};
+    
+                    data.forEach(({ State, City }) => {
+                        if (!stateCityMap[State]) {
+                            stateCityMap[State] = [];
+                        }
+                        stateCityMap[State].push(City);
+                    });
+    
+                    setStatesWithCities(stateCityMap);
+                },
+            });
+        };
+    
+        fetchCityStateData();
+    }, []);
 
     const handleFileUpload = async (event) => {
         const files = Array.from(event.target.files);
-        
         const fileData = await Promise.all(files.map(file => new Promise((resolve, reject) => {
             const reader = new FileReader();
             reader.onloadend = () => resolve({ name: file.name, type: file.type, size: file.size, data: reader.result.split(',')[1] });
             reader.onerror = reject;
             reader.readAsDataURL(file);
         })));
-
         setUploadedFiles(fileData);
         toast.success("Document(s) uploaded successfully.");
     };
 
     const handleSubmit = () => {
-        if (!name || !state || !city || !category || !caseState || !facts || !acceptedTerms) {
-            toast.error("Please fill out all fields and accept the terms.");
-            return;
-        }
-
         const formData = {
             name,
-            state,
-            city,
-            category,
-            caseState,
+            state: state === "Others" ? customCaseState : state,
+            city: city === "Others" ? customCity : city,
+            category: category === "Others" ? customCategory : category,
+            caseState: caseState === "Other" ? customCaseState : caseState,
             facts,
             document: uploadedFiles,
         };
+
+        if (!name || !formData.state || !formData.city || !formData.category || !formData.caseState || !facts || !acceptedTerms) {
+            toast.error("Please fill out all fields and accept the terms.");
+            return;
+        }
 
         sessionStorage.setItem("caseFormData", JSON.stringify(formData));
         navigate('/chat');
@@ -56,7 +89,7 @@ function CaseForm() {
         <section className="flex justify-center items-center min-h-screen bg-gray-100 p-5">
             <div className="bg-gray-50 shadow-lg rounded-2xl w-full max-w-3xl p-8 space-y-6">
                 <h1 className="text-2xl font-bold text-center text-gray-800">
-                    Welcome to Ajung : AI Legal Companion
+                    Welcome to Ajung: AI Legal Companion
                 </h1>
                 <form className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -72,28 +105,58 @@ function CaseForm() {
                             />
                         </div>
 
-                        {/* State Input */}
+                        {/* State Dropdown */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700">State</label>
-                            <input
-                                type="text"
+                            <select
                                 value={state}
-                                onChange={(e) => setState(e.target.value)}
+                                onChange={(e) => {
+                                    setState(e.target.value);
+                                    setCity(''); // Reset city when state changes
+                                }}
                                 className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                placeholder="Enter your state"
-                            />
+                            >
+                                <option value="">Select State</option>
+                                {Object.keys(statesWithCities).map((stateOption, index) => (
+                                    <option key={index} value={stateOption}>{stateOption}</option>
+                                ))}
+                                <option value="Others">Others</option>
+                            </select>
+                            {state === "Others" && (
+                                <input
+                                    type="text"
+                                    value={customCaseState}
+                                    onChange={(e) => setCustomCaseState(e.target.value)}
+                                    className="w-full p-3 border border-gray-300 rounded-lg mt-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    placeholder="Enter state name"
+                                />
+                            )}
                         </div>
 
-                        {/* City Input */}
+                        {/* City Dropdown */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700">City</label>
-                            <input
-                                type="text"
+                            <select
                                 value={city}
                                 onChange={(e) => setCity(e.target.value)}
                                 className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                placeholder="Enter your city"
-                            />
+                                disabled={!state || state === "Others"}
+                            >
+                                <option value="">Select City</option>
+                                {state && statesWithCities[state]?.map((cityOption, index) => (
+                                    <option key={index} value={cityOption}>{cityOption}</option>
+                                ))}
+                                <option value="Others">Others</option>
+                            </select>
+                            {city === "Others" && (
+                                <input
+                                    type="text"
+                                    value={customCity}
+                                    onChange={(e) => setCustomCity(e.target.value)}
+                                    className="w-full p-3 border border-gray-300 rounded-lg mt-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    placeholder="Enter city name"
+                                />
+                            )}
                         </div>
 
                         {/* Category Dropdown */}
@@ -109,6 +172,15 @@ function CaseForm() {
                                     <option key={index} value={option}>{option}</option>
                                 ))}
                             </select>
+                            {category === "Others" && (
+                                <input
+                                    type="text"
+                                    value={customCategory}
+                                    onChange={(e) => setCustomCategory(e.target.value)}
+                                    className="w-full p-3 border border-gray-300 rounded-lg mt-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    placeholder="Enter custom category"
+                                />
+                            )}
                         </div>
 
                         {/* Case State Dropdown */}
@@ -119,11 +191,20 @@ function CaseForm() {
                                 onChange={(e) => setCaseState(e.target.value)}
                                 className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                             >
-                                <option value="">Select state</option>
+                                <option value="">Select State</option>
                                 {caseStateOptions.map((option, index) => (
                                     <option key={index} value={option}>{option}</option>
                                 ))}
                             </select>
+                            {caseState === "Other" && (
+                                <input
+                                    type="text"
+                                    value={customCaseState}
+                                    onChange={(e) => setCustomCaseState(e.target.value)}
+                                    className="w-full p-3 border border-gray-300 rounded-lg mt-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    placeholder="Enter custom state"
+                                />
+                            )}
                         </div>
 
                         {/* Upload Document */}
@@ -167,7 +248,6 @@ function CaseForm() {
                                 I accept the <a href="#" className="text-blue-500 underline">Terms of use</a> & <a href="#" className="text-blue-500 underline">Privacy policy</a>
                             </label>
                         </div>
-
                         <div className="flex items-center">
                             <input
                                 type="checkbox"
