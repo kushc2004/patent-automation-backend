@@ -76,7 +76,11 @@ function CaseForm() {
             document: uploadedFiles,
         };
 
-        if (!name || !formData.state || !formData.city || !formData.category || !formData.caseState || !facts || !acceptedTerms) {
+        // if (!name || !formData.state || !formData.city || !formData.category || !formData.caseState || !facts || !acceptedTerms) {
+        //     toast.error("Please fill out all fields and accept the terms.");
+        //     return;
+        // }
+        if (!name || !formData.state || !formData.city || !formData.category || !formData.caseState || !facts) {
             toast.error("Please fill out all fields and accept the terms.");
             return;
         }
@@ -89,7 +93,7 @@ function CaseForm() {
         <section className="flex justify-center items-center min-h-screen bg-gray-100 p-5">
             <div className="bg-gray-50 shadow-lg rounded-2xl w-full max-w-3xl p-8 space-y-6">
                 <h1 className="text-2xl font-bold text-center text-gray-800">
-                    Welcome to Ajung: AI Legal Companion
+                    Welcome to Banthry: Your AI Legal Companion
                 </h1>
                 <form className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -236,7 +240,7 @@ function CaseForm() {
                     </div>
 
                     {/* Terms and Subscribe Checkboxes */}
-                    <div className="flex items-start space-x-4">
+                    {/* <div className="flex items-start space-x-4">
                         <div className="flex items-center">
                             <input
                                 type="checkbox"
@@ -259,7 +263,7 @@ function CaseForm() {
                                 Subscribe to our email notifications to stay up to date
                             </label>
                         </div>
-                    </div>
+                    </div> */}
 
                     {/* Analyse Button */}
                     <div className="text-center">

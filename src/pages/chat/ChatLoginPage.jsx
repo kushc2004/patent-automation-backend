@@ -1,45 +1,52 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/outline';
 import axios from 'axios';
+import './login.css';
 
 const slides = [
     {
-        title: "AutoReview",
+        title: "AI Assisted Opinion",
         content: [
-            "Automated review of legal documents",
-            "Identifies potential issues & discrepancies",
-            "Suggests improvements based on best practices",
-            "Streamlines the document review process",
-            "Compares two documents & reviews them to make it easier for users to go through the comparisons",
-            "Bulk reviews documents to assist user better"
+            "Reduce research, review, and drafting time by 80%",
+            "Generates legal opinions with comprehensive insights for case analysis",
+            "Identifies precedents, statutes, and enables interactive chat with opinions",
+            "Edit option to incorporate your own insights into the opinion",
+            "Submit documents to court registry and clients with a single click",
+            "Utilizes state-of-the-art Vision and Language Models, supporting Indian language documents"
         ]
     },
     {
-        title: "Mask",
+        title: "Auto Research, Draft & Review",
         content: [
-            "Data redaction that automatically identifies & redacts digital & non-digital documents.",
-            "State-of-the-art Vision & Language Models being used",
-            "On-Premise deployment",
-            "Works on Indian language documents",
-            "Ability to add tags for redaction",
-            "Batch processing for 100s of documents",
-            "Asynchronous processing"
+            "Automated review of legal documents, including contracts and briefs",
+            "Identifies potential issues and discrepancies, suggesting improvements",
+            "Searches precise legal precedents and provides summaries with extracted arguments for quick reference",
+            "Adapts drafting style based on user-provided documents and instructions",
+            "Feature coming soon"
         ]
     },
     {
-        title: "Extract",
+        title: "AI Assisted IP Service",
         content: [
-            "Ability to add tags, custom questions & entities for extraction.",
-            "State-of-the-art Vision & Language Models being used",
-            "On-Premise deployment",
-            "Works on Indian language documents",
-            "Batch processing for 100s of documents",
-            "Asynchronous processing"
+            "Patent search with comprehensive prior art analysis through AI-powered searches",
+            "AI-assisted patent drafting and prosecution",
+            "IP portfolio management and analytics",
+            "Automated trademark searches, drafting, and monitoring for brand protection",
+            "Feature coming soon"
         ]
     },
-    // Add more slides as needed
-];
+    {
+        title: "AI Powered ADR",
+        content: [
+            "Automates the ADR process for dispute resolution",
+            "AI-driven tools to support mediators and arbitrators",
+            "Analyzes case documents and generates summarized reports",
+            "Assesses case strengths and predicts potential outcomes for strategic planning"
+        ]
+    }
+]
+
 
 const InputField = ({ label, placeholder, value, onChange, type = "text" }) => (
     <div className="flex flex-col mt-6 w-full max-w-[444px]">
@@ -69,12 +76,26 @@ const LoginButton = ({ onClick }) => (
     </button>
 );
 
+
 const ChatLoginPage = () => {
     const [currentIndex, setCurrentIndex] = useState(0);
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const navigate = useNavigate();
+
+    const [animationClass, setAnimationClass] = useState("fade-enter");
+
+useEffect(() => {
+    const interval = setInterval(() => {
+        setAnimationClass("fade-exit"); // Start the exit animation
+        setTimeout(() => {
+            setCurrentIndex((prevIndex) => (prevIndex === slides.length - 1 ? 0 : prevIndex + 1));
+            setAnimationClass("fade-enter"); // Trigger the enter animation for the next slide
+        }, 500); // Wait for exit animation to finish
+    }, 4000); // Change slide every 5 seconds
+    return () => clearInterval(interval);
+}, []);
 
     const handlePrev = () => {
         setCurrentIndex((prevIndex) => (prevIndex === 0 ? slides.length - 1 : prevIndex - 1));
@@ -89,7 +110,7 @@ const ChatLoginPage = () => {
     
         try {
             const response = await axios.post(
-                'https://legalai-backend.onrender.com/api/chat-login',
+                'http://127.0.0.1:5000/api/chat-login',
                 { username, password },
                 {
                     headers: {
@@ -118,28 +139,29 @@ const ChatLoginPage = () => {
             {/* Left Side - Carousel */}
             <section className="flex flex-col justify-center items-center bg-[#1F1515] p-8 w-1/2 h-full text-white relative">
             <div className="absolute top-4 text-center w-full">
-                <h1 className="text-4xl font-bold mt-8">AI Legal Companion</h1>
+                <h1 className="text-4xl font-bold mt-8">Banthry AI</h1>
+                <h1 className="text-2xl font-bold mt-4 text-gray-300">Your AI Legal Companion</h1>
             </div>
             
             {/* Content Section */}
-            <div className="flex-1 flex items-center justify-center mt-8">
-                <div className="text-center p-6 bg-[#252525] rounded-lg max-w-md">
-                    <h2 className="text-2xl font-semibold mb-4">{slides[currentIndex].title}</h2>
-                    <ul className="list-disc pl-5 space-y-2 text-gray-200 text-sm">
-                        {slides[currentIndex].content.map((item, index) => (
-                            <li key={index}>{item}</li>
-                        ))}
-                    </ul>
-                </div>
+            <div className="text-center p-8 bg-[#252525] rounded-lg shadow-lg max-w-md">
+                <h2 className="text-2xl font-semibold mb-4 text-white">{slides[currentIndex].title}</h2>
+                <ul className="list-disc pl-5 space-y-2 text-gray-300 text-sm">
+                    {slides[currentIndex].content.map((item, index) => (
+                        <li key={index}>{item}</li>
+                    ))}
+                </ul>
             </div>
 
+
                 {/* Carousel Controls */}
-                <button onClick={handlePrev} className="absolute left-1 text-gray-300">
-                    <ChevronLeftIcon className="w-10 h-10" />
-                </button>
-                <button onClick={handleNext} className="absolute right-1 text-gray-300">
-                    <ChevronRightIcon className="w-10 h-10" />
-                </button>
+                <button onClick={handlePrev} className="absolute left-4 text-gray-300 bg-[#252525] p-2 rounded-full shadow-md hover:bg-gray-500">
+    <ChevronLeftIcon className="w-8 h-8" />
+</button>
+<button onClick={handleNext} className="absolute right-4 text-gray-300 bg-[#252525] p-2 rounded-full shadow-md hover:bg-gray-500">
+    <ChevronRightIcon className="w-8 h-8" />
+</button>
+
             </section>
 
             {/* Right Side - Login Form */}

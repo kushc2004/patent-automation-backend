@@ -13,7 +13,7 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 // Template for generating prompts
 const prompt_template = `
-You are an expert in Legal Assistance and your job is to analyse the User's case and respond to queries by the user. Your name is Legal AI, and assume yourself as an Legal Assistant.
+You are an expert in Legal Assistance and your job is to analyse the User's case and respond to queries by the user. Your name is Banthry AI, and assume yourself as an Legal Assistant.
 
 Refer to the Chat History if required.
 
@@ -34,6 +34,7 @@ Refer to the Chat History if required.
     dva for Domestic Violence Act
     hma for Hindu Marriage Act
     ida for Indian Divorce Act
+    sma for Special Marriage Act
     ../ and so on
 
 Below is the user query:
@@ -91,7 +92,7 @@ const client = async (prompt, history) => {
 
 const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, activeChat }) => {
     const initialHistory = [
-        { text: "Hello! I am your legal assistant AI. Please select 'For' or 'Against' for an opinion.", sender: 'model' }
+        { text: "Hello! I am Banthry AI, <br> Here to assist your legal queries. Please select 'For' or 'Against' for an opinion.", sender: 'model' }
     ];
 
     const [messages, setMessages] = useState(initialHistory);
@@ -108,6 +109,7 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
     const [fileUrls, setFileUrls] = useState({});
     const [isTyping, setIsTyping] = useState(false);
     const [showOpinionButtons, setShowOpinionButtons] = useState(true);
+    const [caseCategory, setCaseCategory] = useState('');
 
     useEffect(() => {
         if (chatContainerRef.current) {
@@ -164,17 +166,31 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
     };
 
     // Helper function to replace references with placeholders
-    const replaceReferencesWithPlaceholders = (text, references) => {
+    const replaceReferencesWithPlaceholders = async (text, references) => {
         let placeholderMap = {};
         let modifiedText = text;
-        references.forEach((ref, index) => {
-            const placeholder = `[[ref${index}]]`;
+    
+        for (const ref of references) {
+            let placeholder = `[${ref.text}]`;
+    
+            if (ref.type === 'case') {
+                // Wait for the async function to complete and fetch the title
+                const titleResult = await fetchCaseTitle(ref.id);
+                console.log(titleResult);
+                const title = titleResult ? titleResult : "Unknown Title";
+                placeholder = `[[reference: ${title}]]`;
+            } else {
+                placeholder = `[[reference: ${ref.text}]]`;
+            }
+    
+            console.log(ref);
             placeholderMap[placeholder] = ref;
             const regex = new RegExp(`<span[^>]*>${ref.text}</span>`, 'g');
             modifiedText = modifiedText.replace(regex, placeholder);
-        });
+        }
         return { modifiedText, placeholderMap };
     };
+    
 
     // Helper function to replace placeholders with references
     const replacePlaceholdersWithReferences = (text, placeholderMap) => {
@@ -182,24 +198,24 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
         Object.keys(placeholderMap).forEach(placeholder => {
             const ref = placeholderMap[placeholder];
             if (ref.type === 'case') {
-                modifiedText = modifiedText.replace(placeholder, `<span data-ref-case="${ref.id}" class="reference-badge" style="cursor:pointer;color:blue;">${ref.text}</span>`);
+                modifiedText = modifiedText.replaceAll(placeholder, `<span data-ref-case="${ref.id}" class="reference-badge" style="cursor:pointer;color:blue;">${ref.text}</span>`);
             }
             if (ref.type === 'code') {
-                modifiedText = modifiedText.replace(placeholder, `<span data-ref-code="${ref.act}" data-ref-section="${ref.section}" class="reference-badge" style="cursor:pointer;color:blue;">${ref.text}</span>`);
+                modifiedText = modifiedText.replaceAll(placeholder, `<span data-ref-code="${ref.act}" data-ref-section="${ref.section}" class="reference-badge" style="cursor:pointer;color:blue;">${ref.text}</span>`);
             }
         });
         return modifiedText;
     };
 
     // Enter edit mode by extracting plain text and references
-    const enterEditMode = () => {
+    const enterEditMode = async () => {
         const latestBotMessage = messages.slice().reverse().find((msg) => msg.sender === 'model');
         if (latestBotMessage) {
             const plainText = stripHtml(latestBotMessage.text);
             const references = extractReferences(latestBotMessage.text);
-            const { modifiedText, placeholderMap } = replaceReferencesWithPlaceholders(latestBotMessage.text, references);
+            const { modifiedText, placeholderMap } = await replaceReferencesWithPlaceholders(latestBotMessage.text, references);
             setEditContent(modifiedText);
-            setEditReferences(references); // Store references
+            setEditReferences(references);
             setEditPlaceholders(placeholderMap);
             setEditMode(true);
             setIsDocumentCollapsed(true);
@@ -249,22 +265,46 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
         ]);
 
         try {
-            const data = {
-                query: sessionData.facts,
-                category: sessionData.category,
-                status: sessionData.caseState,
-                opinion_direction: direction,
-            };
+            // const data = {
+            //     query: sessionData.facts,
+            //     category: sessionData.category,
+            //     status: sessionData.caseState,
+            //     opinion_direction: direction,
+            // };
 
-            const textresponse = await axios.post('https://legalai-backend.onrender.com/api/generate_opinion', data, {
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                },
-                withCredentials: true,
-            });
+            // const textresponse = await axios.post('http://127.0.0.1:5000/api/generate_opinion', data, {
+            //     headers: {
+            //         'Content-Type': 'application/json',
+            //         'Accept': 'application/json',
+            //     },
+            //     withCredentials: true,
+            // });
 
-            const response = JSON.parse(textresponse.data.opinion);
+            // const response = JSON.parse(textresponse.data.opinion);
+
+            const storedData = JSON.parse(sessionStorage.getItem("caseFormData")) || {};
+    const { facts, category, caseState, document } = storedData;
+
+
+            const formData = new FormData();
+        formData.append("query", facts);
+        formData.append("category", category);
+        formData.append("status", caseState);
+        formData.append("opinion_direction", direction);
+        setCaseCategory(category);
+        
+        // Append each file to formData
+        document.forEach((file, index) => {
+            formData.append(`file_${index}`, file.data); // Ensure data format matches backend needs
+        });
+
+        const textresponse = await axios.post('http://127.0.0.1:5000/api/generate_opinion', formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data',
+            },
+        });
+
+        const response = JSON.parse(textresponse.data.opinion);
             console.log(response);
 
             const refCases = response.ref_case || {};
@@ -303,7 +343,7 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
 
     const fetchCaseText = async (caseId, highlightIndexes) => {
         try {
-            const response = await axios.get(`https://legalai-backend.onrender.com/fetch-case-text/${caseId}`);
+            const response = await axios.get(`http://127.0.0.1:5000/fetch-case-text/${caseId}`);
             const caseText = response.data;
 
             // Split the text into paragraphs and add highlighting for specific indexes
@@ -320,13 +360,32 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
 
     const fetchCodeText = async (act, section) => {
         try {
-            const response = await axios.get(`https://legalai-backend.onrender.com/fetch-code-text/${act}/${section.split('(')[0]}`);
+            const response = await axios.get(`http://127.0.0.1:5000/fetch-code-text/${act}/${section.split('(')[0]}`);
             return response.data.content;
         } catch (error) {
             console.error("Error fetching code text:", error);
             return `Could not retrieve text for ${act}, Section ${section}.`;
         }
     };
+
+    const fetchCaseTitle = async(caseId) => {
+        try {
+            const response = await axios.get(`http://127.0.0.1:5000/fetch-case-title/${caseId}`);
+            const data = response.data;
+    
+            if (data.error) {
+                console.error(data.error);
+                return null;
+            }
+    
+            const title = data.title || "No title available";
+            
+            return title;
+        } catch (error) {
+            console.error("Error fetching case data:", error);
+            return null;
+        }
+    }
 
     const replaceTagsWithLinks = (opinionText, caseRef) => {
         const caseIds = Object.keys(caseRef);
@@ -344,9 +403,7 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
     // Function to Handle Reference Clicks
     const handleReferenceClick = ({ type, id, act, section }) => {
         if (type === 'case') {
-            fetchCaseText(id, refCases[id]).then(caseTexts => {
-                openCaseOverlay(caseTexts[id] || "Could not retrieve case text.");
-            }); 
+            openCaseOverlay(caseTexts[id] || "Could not retrieve case text.");
         } else if (type === 'code') {
             fetchCodeText(act, section).then(content => {
                 openCaseOverlay(content);
@@ -383,7 +440,7 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
 
         try {
             const filteredHistory = messages.filter(
-                (msg) => msg.text !== "Hello! I am your legal assistant AI. Please select 'For' or 'Against' for an opinion."
+                (msg) => msg.text !== "Hello! I am Banthry AI, <br> Here to assist your legal queries. Please select 'For' or 'Against' for an opinion."
             );
             const prompt = prompt_template.replace('{user_query}', inputMessage);
             const aiResponse = await client(prompt, filteredHistory);
@@ -422,9 +479,9 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
         }
     
         try {
-            const response = await axios.post('https://legalai-backend.onrender.com/api/save_chat_history', {
+            const response = await axios.post('http://127.0.0.1:5000/api/save_chat_history', {
                 chat_history: messages,
-                chat_title: activeChat?.title || `Chat on ${new Date().toLocaleString()}`
+                chat_title: activeChat?.title || `${caseCategory}: ${new Date().toLocaleString()}`
             }, {
                 withCredentials: true,
                 headers: {
@@ -449,7 +506,7 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
                 ${setIsDocumentCollapsed ? 'w-full' : 'w-3/4'}
             `}
             style={{
-                backgroundImage: messages.length > 1 ? 'none' : 'url("assets/img/bg-dots.svg")',
+                // backgroundImage: messages.length > 1 ? 'none' : 'url("assets/img/bg-dots.svg")',
                 backgroundSize: 'contain',
                 backgroundPosition: 'center',
                 backgroundRepeat: 'no-repeat',
@@ -459,32 +516,41 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
             <ToastContainer />
 
             {/* Edit Button */}
-            {!editMode && (
-                <button onClick={enterEditMode} className="w-1/6 self-end m-4 text-gray-700 hover:text-gray-700 rounded-full bg-white py-2">
-                    ✏️ Edit Opinion
-                </button>
-            )}
+            <div className="flex justify-between items-center px-4 py-2 space-x-4">
+    {/* Opinion Toggle Button */}
+    <div className="w-1/3 flex items-center">
+        <button
+            onClick={() => handleOpinionSelection(opinionDirection === 'for' ? 'against' : 'for')}
+            className="flex items-center px-4 py-2 bg-gray-700 rounded-full font-semibold transition duration-200"
+            style={{ width: 'auto' }}
+        >
+            <div
+                className={`flex items-center justify-center w-6 h-6 rounded-full bg-white transition-all duration-200 ${
+                    opinionDirection === 'for' ? 'translate-x-2' : 'translate-x-0'
+                }`}
+            ></div>
+            <span
+                className={`ml-2 transition-all duration-200 text-white ${
+                    opinionDirection === 'for' ? 'order-first' : 'order-last'
+                } text-gray-700`}
+            >
+                {opinionDirection === 'for' ? 'In Favor' : 'Against'}
+            </span>
+        </button>
+    </div>
 
-            {/* Opinion Selection Buttons */}
-            <div className="w-1/4 flex justify-start px-4 py-2 -mt-16">
-                <button
-                    onClick={() => handleOpinionSelection(opinionDirection === 'for' ? 'against' : 'for')}
-                    className="flex items-center px-4 py-2 w-32 bg-gray-700 rounded-full font-semibold transition duration-200"
-                >
-                    <div
-                        className={`flex items-center justify-center w-6 h-6 rounded-full bg-white transition-all duration-200 ${
-                            opinionDirection === 'for' ? 'translate-x-4' : 'translate-x-0'
-                        }`}
-                    ></div>
-                    <span
-                        className={`ml-2 transition-all duration-200 text-white ${
-                            opinionDirection === 'for' ? 'order-first' : 'order-last'
-                        } text-gray-700`}
-                    >
-                        {opinionDirection === 'for' ? 'In Favor' : 'Against'}
-                    </span>
-                </button>
-            </div>
+    {/* Edit Opinion Button */}
+    {!editMode && (
+        <button
+            onClick={enterEditMode}
+            className="w-1/6 self-end m-4 text-gray-700 hover:text-gray-700 rounded-full bg-white py-2 whitespace-nowrap"
+        >
+            ✏️ Edit Opinion
+        </button>
+    )}
+</div>
+
+
 
             {/* Main Chat Area */}
             <div className="flex-1 flex overflow-hidden">
@@ -567,11 +633,11 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
                                 'link', 'blockquote', 'code-block',
                                 'list', 'bullet', 'align'
                             ]}
-                            className="h-3/5"
+                            className="relative h-3/5"
                         />
                         <button
                             onClick={saveEdit}
-                            className="relative mt-4 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition duration-200"
+                            className="flex mt-20 px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-500 transition duration-200"
                         >
                             Save
                         </button>
