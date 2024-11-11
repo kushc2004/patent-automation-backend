@@ -110,7 +110,7 @@ useEffect(() => {
     
         try {
             const response = await axios.post(
-                'http://127.0.0.1:5000/api/chat-login',
+                'https://legalai-backend.onrender.com/api/chat-login',
                 { username, password },
                 {
                     headers: {

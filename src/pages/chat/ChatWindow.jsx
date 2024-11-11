@@ -272,7 +272,7 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
             //     opinion_direction: direction,
             // };
 
-            // const textresponse = await axios.post('http://127.0.0.1:5000/api/generate_opinion', data, {
+            // const textresponse = await axios.post('https://legalai-backend.onrender.com/api/generate_opinion', data, {
             //     headers: {
             //         'Content-Type': 'application/json',
             //         'Accept': 'application/json',
@@ -298,7 +298,7 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
             formData.append(`file_${index}`, file.data); // Ensure data format matches backend needs
         });
 
-        const textresponse = await axios.post('http://127.0.0.1:5000/api/generate_opinion', formData, {
+        const textresponse = await axios.post('https://legalai-backend.onrender.com/api/generate_opinion', formData, {
             headers: {
                 'Content-Type': 'multipart/form-data',
             },
@@ -343,7 +343,7 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
 
     const fetchCaseText = async (caseId, highlightIndexes) => {
         try {
-            const response = await axios.get(`http://127.0.0.1:5000/fetch-case-text/${caseId}`);
+            const response = await axios.get(`https://legalai-backend.onrender.com/fetch-case-text/${caseId}`);
             const caseText = response.data;
 
             // Split the text into paragraphs and add highlighting for specific indexes
@@ -360,7 +360,7 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
 
     const fetchCodeText = async (act, section) => {
         try {
-            const response = await axios.get(`http://127.0.0.1:5000/fetch-code-text/${act}/${section.split('(')[0]}`);
+            const response = await axios.get(`https://legalai-backend.onrender.com/fetch-code-text/${act}/${section.split('(')[0]}`);
             return response.data.content;
         } catch (error) {
             console.error("Error fetching code text:", error);
@@ -370,7 +370,7 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
 
     const fetchCaseTitle = async(caseId) => {
         try {
-            const response = await axios.get(`http://127.0.0.1:5000/fetch-case-title/${caseId}`);
+            const response = await axios.get(`https://legalai-backend.onrender.com/fetch-case-title/${caseId}`);
             const data = response.data;
     
             if (data.error) {
@@ -479,7 +479,7 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
         }
     
         try {
-            const response = await axios.post('http://127.0.0.1:5000/api/save_chat_history', {
+            const response = await axios.post('https://legalai-backend.onrender.com/api/save_chat_history', {
                 chat_history: messages,
                 chat_title: activeChat?.title || `${caseCategory}: ${new Date().toLocaleString()}`
             }, {
