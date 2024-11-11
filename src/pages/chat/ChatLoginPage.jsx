@@ -22,8 +22,7 @@ const slides = [
             "Automated review of legal documents, including contracts and briefs",
             "Identifies potential issues and discrepancies, suggesting improvements",
             "Searches precise legal precedents and provides summaries with extracted arguments for quick reference",
-            "Adapts drafting style based on user-provided documents and instructions",
-            "Feature coming soon"
+            "Adapts drafting style based on user-provided documents and instructions"
         ]
     },
     {
@@ -32,8 +31,7 @@ const slides = [
             "Patent search with comprehensive prior art analysis through AI-powered searches",
             "AI-assisted patent drafting and prosecution",
             "IP portfolio management and analytics",
-            "Automated trademark searches, drafting, and monitoring for brand protection",
-            "Feature coming soon"
+            "Automated trademark searches, drafting, and monitoring for brand protection"
         ]
     },
     {
@@ -144,23 +142,34 @@ useEffect(() => {
             </div>
             
             {/* Content Section */}
-            <div className="text-center p-8 bg-[#252525] rounded-lg shadow-lg max-w-md">
+            <div className="text-center p-8 bg-[#252525] rounded-lg shadow-lg max-w-md relative">
                 <h2 className="text-2xl font-semibold mb-4 text-white">{slides[currentIndex].title}</h2>
+                
+                {/* Label for "Live Now" or "Coming Soon" */}
+                <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-2">
+                    {currentIndex === 0 ? (
+                        <span className="px-4 py-1 rounded-full bg-green-100 text-green-700 text-sm font-semibold opacity-80">Live Now</span>
+                    ) : (
+                        <span className="px-4 py-1 rounded-full bg-red-100 text-red-700 text-sm font-semibold opacity-80">Coming Soon</span>
+                    )}
+                </div>
+
                 <ul className="list-disc pl-5 space-y-2 text-gray-300 text-sm">
                     {slides[currentIndex].content.map((item, index) => (
-                        <li key={index}>{item}</li>
+                        <li className="ml-4 text-left" key={index}>{item}</li>
                     ))}
                 </ul>
             </div>
 
 
+
                 {/* Carousel Controls */}
                 <button onClick={handlePrev} className="absolute left-4 text-gray-300 bg-[#252525] p-2 rounded-full shadow-md hover:bg-gray-500">
-    <ChevronLeftIcon className="w-8 h-8" />
-</button>
-<button onClick={handleNext} className="absolute right-4 text-gray-300 bg-[#252525] p-2 rounded-full shadow-md hover:bg-gray-500">
-    <ChevronRightIcon className="w-8 h-8" />
-</button>
+                    <ChevronLeftIcon className="w-8 h-8" />
+                </button>
+                <button onClick={handleNext} className="absolute right-4 text-gray-300 bg-[#252525] p-2 rounded-full shadow-md hover:bg-gray-500">
+                    <ChevronRightIcon className="w-8 h-8" />
+                </button>
 
             </section>
 

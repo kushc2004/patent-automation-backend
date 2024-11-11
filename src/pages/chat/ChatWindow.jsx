@@ -543,7 +543,7 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
     {!editMode && (
         <button
             onClick={enterEditMode}
-            className="w-1/6 self-end m-4 text-gray-700 hover:text-gray-700 rounded-full bg-white py-2 whitespace-nowrap"
+            className="w-1/6 min-w-fit self-end m-4 px-2 text-gray-700 hover:text-gray-700 rounded-full bg-white py-2 whitespace-nowrap"
         >
             ✏️ Edit Opinion
         </button>
