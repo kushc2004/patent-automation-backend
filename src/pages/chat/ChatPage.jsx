@@ -115,7 +115,7 @@ const ChatPage = () => {
                             {!isCaseOverlayOpen ? (
                                 <div>
                                     <div className="flex items-center justify-center text-white p-4">
-                                        <img src="assets/img/logo.svg" alt="App Logo" className="h-10 w-10 mr-4" />
+                                        {/* <img src="assets/img/logo.svg" alt="App Logo" className="h-10 w-10 mr-4" /> */}
                                         <h1 className="text-xl font-bold text-[#26262A]">Banthry AI</h1>
                                     </div>
 
