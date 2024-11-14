@@ -139,6 +139,20 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
         return tmp.textContent || tmp.innerText || "";
     };
 
+    // Helper function to encode HTML entities
+    const encodeHtmlEntities = (text) => {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    };
+
+    // Helper function to decode HTML entities
+    const decodeHtmlEntities = (text) => {
+        const parser = new DOMParser();
+        const decodedString = parser.parseFromString(text, 'text/html').documentElement.textContent;
+        return decodedString;
+    };
+
     // Helper function to extract references from HTML content
     const extractReferences = (html) => {
         const parser = new DOMParser();
@@ -171,41 +185,63 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
     const replaceReferencesWithPlaceholders = async (text, references) => {
         let placeholderMap = {};
         let modifiedText = text;
-    
-        for (const ref of references) {
-            let placeholder = `[${ref.text}]`;
-    
+
+        for (const [index, ref] of references.entries()) {
+            let uniqueId = ref.id || `${ref.act}-${ref.section}`;
+            let placeholderText = ref.text;
+
             if (ref.type === 'case') {
-                // Wait for the async function to complete and fetch the title
                 const titleResult = await fetchCaseTitle(ref.id);
-                console.log(titleResult);
-                const title = titleResult ? titleResult : "Unknown Title";
-                placeholder = `[[reference: ${title}]]`;
-            } else {
-                placeholder = `[[reference: ${ref.text}]]`;
+                placeholderText = titleResult ? titleResult : "Unknown Title";
             }
-    
-            console.log(ref);
-            placeholderMap[placeholder] = ref;
-            const regex = new RegExp(`<span[^>]*>${ref.text}</span>`, 'g');
+
+            // Encode placeholder text to handle special characters
+            const encodedPlaceholderText = encodeHtmlEntities(placeholderText);
+
+            // Create a unique placeholder (using index to ensure uniqueness)
+            const placeholder = `[[ref-${index}-${encodedPlaceholderText}]]`;
+
+            // Encode the original reference text for regex
+            const encodedRefText = encodeHtmlEntities(ref.text);
+
+            // Escape special characters for regex
+            const escapedRefText = encodedRefText.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
+
+            // Replace all instances of the reference with the placeholder
+            const regex = new RegExp(`<span[^>]*>${escapedRefText}</span>`, 'g');
             modifiedText = modifiedText.replace(regex, placeholder);
+
+            // Map the placeholder to the reference
+            placeholderMap[placeholder] = ref;
         }
         return { modifiedText, placeholderMap };
     };
-    
 
     // Helper function to replace placeholders with references
     const replacePlaceholdersWithReferences = (text, placeholderMap) => {
         let modifiedText = text;
-        Object.keys(placeholderMap).forEach(placeholder => {
-            const ref = placeholderMap[placeholder];
-            if (ref.type === 'case') {
-                modifiedText = modifiedText.replaceAll(placeholder, `<span data-ref-case="${ref.id}" class="reference-badge" style="cursor:pointer;color:blue;">${ref.text}</span>`);
-            }
-            if (ref.type === 'code') {
-                modifiedText = modifiedText.replaceAll(placeholder, `<span data-ref-code="${ref.act}" data-ref-section="${ref.section}" class="reference-badge" style="cursor:pointer;color:blue;">${ref.text}</span>`);
-            }
+        console.log("Text with placeholders:", modifiedText);  // Confirm placeholders in text
+        console.log("Placeholder Map:", placeholderMap);        // Confirm placeholders in map
+
+        Object.entries(placeholderMap).forEach(([placeholder, ref]) => {
+            // Encode any special characters in ref.text
+            const encodedRefText = encodeHtmlEntities(ref.text);
+
+            const replacement = ref?.type === 'case'
+                ? `<span data-ref-case="${ref.id}" class="reference-badge" style="cursor:pointer;color:blue;">${encodedRefText}</span>`
+                : `<span data-ref-code="${ref.act}" data-ref-section="${ref.section}" class="reference-badge" style="cursor:pointer;color:blue;">${encodedRefText}</span>`;
+
+            // Escape the placeholder text for use in a regular expression
+            const escapedPlaceholder = placeholder.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
+
+            // Create a new regular expression with the global flag to match all occurrences
+            const regex = new RegExp(escapedPlaceholder, 'g');
+
+            // Replace all instances of the placeholder with the replacement text
+            modifiedText = modifiedText.replace(regex, replacement);
         });
+
+        console.log("After replacement:", modifiedText);
         return modifiedText;
     };
 
@@ -232,7 +268,7 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
     const saveEdit = () => {
         const updatedTextWithPlaceholders = editContent;
         const updatedText = replacePlaceholdersWithReferences(updatedTextWithPlaceholders, editPlaceholders);
-    
+
         // Update the `messages` state
         setMessages((prev) => {
             const messagesCopy = [...prev];
@@ -244,7 +280,7 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
             
             return messagesCopy;
         });
-    
+
         // Update `activeChat` if necessary
         if (activeChat) {
             setActiveChat(prev => ({
@@ -256,7 +292,7 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
                 )
             }));
         }
-    
+
         // Close the edit mode and the modal
         setEditMode(false);
         setIsDocumentCollapsed(false);
@@ -264,9 +300,6 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
             setIsEditModalOpen(false);
         }
     };
-    
-
-    // Removed the automatic save useEffect
 
     const handleOpinionSelection = async (direction) => {
         setOpinionDirection(direction);
@@ -279,46 +312,28 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
         ]);
 
         try {
-            // const data = {
-            //     query: sessionData.facts,
-            //     category: sessionData.category,
-            //     status: sessionData.caseState,
-            //     opinion_direction: direction,
-            // };
-
-            // const textresponse = await axios.post('https://legalai-backend.onrender.com/api/generate_opinion', data, {
-            //     headers: {
-            //         'Content-Type': 'application/json',
-            //         'Accept': 'application/json',
-            //     },
-            //     withCredentials: true,
-            // });
-
-            // const response = JSON.parse(textresponse.data.opinion);
-
             const storedData = JSON.parse(sessionStorage.getItem("caseFormData")) || {};
-    const { facts, category, caseState, document } = storedData;
-
+            const { facts, category, caseState, document } = storedData;
 
             const formData = new FormData();
-        formData.append("query", facts);
-        formData.append("category", category);
-        formData.append("status", caseState);
-        formData.append("opinion_direction", direction);
-        setCaseCategory(category);
-        
-        // Append each file to formData
-        document.forEach((file, index) => {
-            formData.append(`file_${index}`, file.data); // Ensure data format matches backend needs
-        });
+            formData.append("query", facts);
+            formData.append("category", category);
+            formData.append("status", caseState);
+            formData.append("opinion_direction", direction);
+            setCaseCategory(category);
+            
+            // Append each file to formData
+            document.forEach((file, index) => {
+                formData.append(`file_${index}`, file.data); // Ensure data format matches backend needs
+            });
 
-        const textresponse = await axios.post('https://legalai-backend.onrender.com/api/generate_opinion', formData, {
-            headers: {
-                'Content-Type': 'multipart/form-data',
-            },
-        });
+            const textresponse = await axios.post('https://legalai-backend.onrender.com/api/generate_opinion', formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                },
+            });
 
-        const response = JSON.parse(textresponse.data.opinion);
+            const response = JSON.parse(textresponse.data.opinion);
             console.log(response);
 
             const refCases = response.ref_case || {};
@@ -407,10 +422,10 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
         return opinionText
             .replace(/<case_id:(\w+)>/g, (match, caseId) => {
                 const caseIndex = caseIds.indexOf(caseId) !== -1 ? caseIds.indexOf(caseId) + 1 : '?';
-                return `<span data-ref-case="${caseId}" class="reference-badge" style="cursor:pointer;color:blue;">‎ Case ${caseIndex}</span>`;
+                return `<span data-ref-case="${caseId}" class="reference-badge" style="cursor:pointer;color:blue;">Case ${caseIndex}</span>`;
             })
-            .replace(/<code:(\w+):([\w()]+)>/g, (match, act, section) => {
-                return `<span data-ref-code="${act}" data-ref-section="${section}" class="reference-badge" style="cursor:pointer;color:blue;">‎ ${act} Section:${section}</span>`;
+            .replace(/<code:(\w+):([\w()\s]+)>/g, (match, act, section) => { // Allow spaces and parentheses
+                return `<span data-ref-code="${act}" data-ref-section="${section}" class="reference-badge" style="cursor:pointer;color:blue;">${act} Section: ${section}</span>`;
             });
     };
 
@@ -461,7 +476,10 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
             console.log("gemini response: ", aiResponse);
             const processedResponse = replaceTagsWithLinks(aiResponse, {});
             if (aiResponse) {
-                const botMessage = { text: processedResponse, sender: 'model' };
+                // Sanitize the processed response
+                const sanitizedResponse = DOMPurify.sanitize(processedResponse, { USE_PROFILES: { html: true } });
+
+                const botMessage = { text: sanitizedResponse, sender: 'model' };
                 setMessages((prev) => [
                     ...prev,
                     botMessage,
@@ -554,7 +572,7 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
                 {!editMode && (
                     <button
                         onClick={enterEditMode}
-                        className="w-1/6 min-w-fit self-end m-4 px-2 text-gray-700 hover:text-gray-700 rounded-full bg-white py-2 whitespace-nowrap"
+                        className="w-1/6 min-w-fit self-end m-4 px-2 text-gray-700 hover:text-gray-800 hover:bg-gray-300 rounded-full bg-white py-2 whitespace-nowrap"
                     >
                         ✏️ Edit Opinion
                     </button>
@@ -655,53 +673,53 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
 
                 {/* Edit Mode Modal for Mobile */}
                 {isEditModalOpen && editMode && (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black bg-opacity-30 backdrop-blur-sm md:hidden h-screen">
-        <div className="flex flex-col bg-white rounded-lg p-6 w-11/12 max-w-md overflow-y-auto max-h-[80vh]">
-            <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-bold">Edit Message</h3>
-                <button
-                    onClick={() => {
-                        setEditMode(false);
-                        setIsDocumentCollapsed(false);
-                        setIsEditModalOpen(false);
-                    }}
-                    className="text-gray-600 hover:text-gray-800 text-xl font-semibold"
-                >
-                    &times;
-                </button>
-            </div>
+                    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black bg-opacity-30 backdrop-blur-sm md:hidden h-screen">
+                        <div className="flex flex-col bg-white rounded-lg p-6 w-11/12 max-w-md overflow-y-auto max-h-[80vh]">
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="text-lg font-bold">Edit Message</h3>
+                                <button
+                                    onClick={() => {
+                                        setEditMode(false);
+                                        setIsDocumentCollapsed(false);
+                                        setIsEditModalOpen(false);
+                                    }}
+                                    className="text-gray-600 hover:text-gray-800 text-xl font-semibold"
+                                >
+                                    &times;
+                                </button>
+                            </div>
 
-            <ReactQuill
-                theme="snow"
-                value={editContent}
-                onChange={setEditContent}
-                modules={{
-                    toolbar: [
-                        ['bold', 'italic', 'underline', 'strike'],
-                        ['link', 'blockquote', 'code-block'],
-                        [{ 'header': 1 }, { 'header': 2 }],
-                        [{ 'list': 'ordered' }, { 'list': 'bullet' }],
-                        [{ 'align': [] }],
-                        ['clean']
-                    ],
-                }}
-                formats={[
-                    'header',
-                    'bold', 'italic', 'underline', 'strike',
-                    'link', 'blockquote', 'code-block',
-                    'list', 'bullet', 'align'
-                ]}
-                className="relative h-full"
-            />
-            <button
-                onClick={saveEdit}
-                className="relative m-auto mt-4 px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-500 transition duration-200 w-full"
-            >
-                Save
-            </button>
-        </div>
-    </div>
-)}
+                            <ReactQuill
+                                theme="snow"
+                                value={editContent}
+                                onChange={setEditContent}
+                                modules={{
+                                    toolbar: [
+                                        ['bold', 'italic', 'underline', 'strike'],
+                                        ['link', 'blockquote', 'code-block'],
+                                        [{ 'header': 1 }, { 'header': 2 }],
+                                        [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+                                        [{ 'align': [] }],
+                                        ['clean']
+                                    ],
+                                }}
+                                formats={[
+                                    'header',
+                                    'bold', 'italic', 'underline', 'strike',
+                                    'link', 'blockquote', 'code-block',
+                                    'list', 'bullet', 'align'
+                                ]}
+                                className="relative h-full"
+                            />
+                            <button
+                                onClick={saveEdit}
+                                className="relative m-auto mt-4 px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-500 transition duration-200 w-full"
+                            >
+                                Save
+                            </button>
+                        </div>
+                    </div>
+                )}
 
             </div>
 
