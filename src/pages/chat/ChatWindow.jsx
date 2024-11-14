@@ -111,6 +111,8 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
     const [showOpinionButtons, setShowOpinionButtons] = useState(true);
     const [caseCategory, setCaseCategory] = useState('');
 
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+
     useEffect(() => {
         if (chatContainerRef.current) {
             chatContainerRef.current.scrollIntoView({ behavior: 'smooth' });
@@ -219,6 +221,10 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
             setEditPlaceholders(placeholderMap);
             setEditMode(true);
             setIsDocumentCollapsed(true);
+
+            if (window.innerWidth < 768) { // Tailwind's md breakpoint is 768px
+                setIsEditModalOpen(true);
+            }
         }
     };
 
@@ -238,6 +244,10 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
         });
         setEditMode(false);
         setIsDocumentCollapsed(false);
+
+        if (window.innerWidth < 768) {
+            setIsEditModalOpen(false);
+        }
 
         // Update activeChat if necessary
         if (activeChat) {
@@ -502,11 +512,8 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
 
     return (
         <div
-            className={`flex flex-col h-full bg-[#EFF3F6] shadow-lg rounded-3xl overflow-hidden
-                ${setIsDocumentCollapsed ? 'w-full' : 'w-3/4'}
-            `}
+            className={`flex flex-col h-full bg-[#EFF3F6] shadow-lg rounded-3xl overflow-hidden transition-all duration-300 w-full`}
             style={{
-                // backgroundImage: messages.length > 1 ? 'none' : 'url("assets/img/bg-dots.svg")',
                 backgroundSize: 'contain',
                 backgroundPosition: 'center',
                 backgroundRepeat: 'no-repeat',
@@ -517,40 +524,38 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
 
             {/* Edit Button */}
             <div className="flex justify-between items-center px-4 py-2 space-x-4">
-    {/* Opinion Toggle Button */}
-    <div className="w-1/3 flex items-center">
-        <button
-            onClick={() => handleOpinionSelection(opinionDirection === 'for' ? 'against' : 'for')}
-            className="flex items-center px-4 py-2 bg-gray-700 rounded-full font-semibold transition duration-200"
-            style={{ width: 'auto' }}
-        >
-            <div
-                className={`flex items-center justify-center w-6 h-6 rounded-full bg-white transition-all duration-200 ${
-                    opinionDirection === 'for' ? 'translate-x-2' : 'translate-x-0'
-                }`}
-            ></div>
-            <span
-                className={`ml-2 transition-all duration-200 text-white ${
-                    opinionDirection === 'for' ? 'order-first' : 'order-last'
-                } text-gray-700`}
-            >
-                {opinionDirection === 'for' ? 'In Favor' : 'Against'}
-            </span>
-        </button>
-    </div>
+                {/* Opinion Toggle Button */}
+                <div className="w-1/3 flex items-center">
+                    <button
+                        onClick={() => handleOpinionSelection(opinionDirection === 'for' ? 'against' : 'for')}
+                        className="flex items-center px-4 py-2 bg-gray-700 rounded-full font-semibold transition duration-200"
+                        style={{ width: 'auto' }}
+                    >
+                        <div
+                            className={`flex items-center justify-center w-6 h-6 rounded-full bg-white transition-all duration-200 ${
+                                opinionDirection === 'for' ? 'translate-x-2' : 'translate-x-0'
+                            }`}
+                        ></div>
+                        <span
+                            className={`ml-2 transition-all duration-200 text-white ${
+                                opinionDirection === 'for' ? 'order-first' : 'order-last'
+                            } text-gray-700`}
+                        >
+                            {opinionDirection === 'for' ? 'In Favor' : 'Against'}
+                        </span>
+                    </button>
+                </div>
 
-    {/* Edit Opinion Button */}
-    {!editMode && (
-        <button
-            onClick={enterEditMode}
-            className="w-1/6 min-w-fit self-end m-4 px-2 text-gray-700 hover:text-gray-700 rounded-full bg-white py-2 whitespace-nowrap"
-        >
-            ✏️ Edit Opinion
-        </button>
-    )}
-</div>
-
-
+                {/* Edit Opinion Button */}
+                {!editMode && (
+                    <button
+                        onClick={enterEditMode}
+                        className="w-1/6 min-w-fit self-end m-4 px-2 text-gray-700 hover:text-gray-700 rounded-full bg-white py-2 whitespace-nowrap"
+                    >
+                        ✏️ Edit Opinion
+                    </button>
+                )}
+            </div>
 
             {/* Main Chat Area */}
             <div className="flex-1 flex overflow-hidden">
@@ -583,7 +588,7 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
                         )}
                         <div ref={chatContainerRef} />
                     </div>
-                    
+
                     {isTyping && (
                         <div className="flex justify-start">
                             <div className="bg-gray-50 text-gray-900 rounded-xl shadow-lg px-4 py-2 inline-block">
@@ -597,8 +602,8 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
                     )}
                 </div>
 
-                {/* Edit Mode Overlay */}
-                {editMode && (
+                {/* Edit Mode Overlay for Desktop */}
+                {!isEditModalOpen && editMode && (
                     <div className="flex flex-col w-1/2 bg-white p-4 shadow-lg transition-all duration-300 overflow-y-auto">
                         <div className="flex justify-between items-center mb-4">
                             <h3 className="text-lg font-bold">Edit Message</h3>
@@ -637,10 +642,60 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
                         />
                         <button
                             onClick={saveEdit}
-                            className="flex mt-20 px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-500 transition duration-200"
+                            className="relative w-full m-auto px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-500 transition duration-200"
                         >
                             Save
                         </button>
+                    </div>
+                )}
+
+                {/* Edit Mode Modal for Mobile */}
+                {isEditModalOpen && editMode && (
+                    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black bg-opacity-50 md:hidden">
+                        <div className="flex flex-col bg-white rounded-lg p-6 w-11/12 max-w-md">
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="text-lg font-bold">Edit Message</h3>
+                                <button
+                                    onClick={() => {
+                                        setEditMode(false);
+                                        setIsDocumentCollapsed(false);
+                                        setIsEditModalOpen(false);
+                                    }}
+                                    className="text-gray-600 hover:text-gray-800 text-xl font-semibold"
+                                >
+                                    &times;
+                                </button>
+                            </div>
+
+                            <ReactQuill
+                                theme="snow"
+                                value={editContent}
+                                onChange={setEditContent}
+                                modules={{
+                                    toolbar: [
+                                        ['bold', 'italic', 'underline', 'strike'],
+                                        ['link', 'blockquote', 'code-block'],
+                                        [{ 'header': 1 }, { 'header': 2 }],
+                                        [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+                                        [{ 'align': [] }],
+                                        ['clean']
+                                    ],
+                                }}
+                                formats={[
+                                    'header',
+                                    'bold', 'italic', 'underline', 'strike',
+                                    'link', 'blockquote', 'code-block',
+                                    'list', 'bullet', 'align'
+                                ]}
+                                className="relative h-full"
+                            />
+                            <button
+                                onClick={saveEdit}
+                                className="relative m-auto mt-4 px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-500 transition duration-200 w-full"
+                            >
+                                Save
+                            </button>
+                        </div>
                     </div>
                 )}
             </div>
@@ -656,7 +711,6 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
                         <path d="M5 3a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V7.414a2 2 0 00-.586-1.414l-4-4A2 2 0 0014.586 2H5zm4 14a1 1 0 112 0 1 1 0 01-2 0zm0-4a1 1 0 012 0v3h2v-3a1 1 0 112 0v3h2v-5H9v5zM13 6V4h1.586L17 6.414V8h-4V6z"/>
                     </svg>
                 </button>
-
 
                 {/* Middle Section: Chat Input */}
                 <form onSubmit={sendMessage} className="flex items-center space-x-4 bg-white px-4 py-2 rounded-full flex-1 shadow-inner">
@@ -681,7 +735,7 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
                     </button>
                 </form>
 
-                {/* Right Section: Insurebuzz Guide */}
+                {/* Right Section: Guide */}
                 <div className="flex items-center py-2 rounded-full">
                     <div className='flex items-center px-3 py-2 m-auto rounded-full bg-gray-50 shadow-inner'>
                         <svg className="w-6 h-6 text-gray-700" fill="currentColor" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
@@ -693,6 +747,8 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
                     </div>
                 </div>
             </div>
+
+            {/* Edit Mode Overlay for Desktop (Removed as it's handled within the component) */}
         </div>
     );
 }

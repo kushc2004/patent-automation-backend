@@ -133,86 +133,83 @@ useEffect(() => {
     
 
     return (
-        <main className="flex h-screen">
-            {/* Left Side - Carousel */}
-            <section className="flex flex-col justify-center items-center bg-[#1F1515] p-8 w-1/2 h-full text-white relative">
-            <div className="absolute top-4 text-center w-full">
-                <h1 className="text-4xl font-bold mt-8">Banthry AI</h1>
-                <h1 className="text-2xl font-bold mt-4 text-gray-300">Your AI Legal Companion</h1>
-            </div>
+        <main className="flex flex-col md:flex-row h-screen">
+    {/* Left Side - Carousel */}
+    <section className="flex flex-col justify-center items-center bg-[#1F1515] p-8 w-full md:w-1/2 h-full text-white relative">
+        <div className="absolute top-4 text-center w-full m-auto md:top-8">
+            <h1 className="text-4xl font-bold mt-8">Banthry AI</h1>
+            <h1 className="text-2xl font-bold mt-4 text-gray-300">Your AI Legal Companion</h1>
+        </div>
+
+        {/* Content Section */}
+        <div className="text-center p-8 bg-[#252525] rounded-lg shadow-lg max-w-md relative">
+            <h2 className="text-2xl font-semibold mb-4 text-white">{slides[currentIndex].title}</h2>
             
-            {/* Content Section */}
-            <div className="text-center p-8 bg-[#252525] rounded-lg shadow-lg max-w-md relative">
-                <h2 className="text-2xl font-semibold mb-4 text-white">{slides[currentIndex].title}</h2>
-                
-                {/* Label for "Live Now" or "Coming Soon" */}
-                <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-2">
-                    {currentIndex === 0 ? (
-                        <span className="px-4 py-1 rounded-full bg-green-100 text-green-700 text-sm font-semibold opacity-80">Live Now</span>
-                    ) : (
-                        <span className="px-4 py-1 rounded-full bg-red-100 text-red-700 text-sm font-semibold opacity-80">Coming Soon</span>
-                    )}
-                </div>
-
-                <ul className="list-disc pl-5 space-y-2 text-gray-300 text-sm">
-                    {slides[currentIndex].content.map((item, index) => (
-                        <li className="ml-4 text-left" key={index}>{item}</li>
-                    ))}
-                </ul>
+            {/* Label for "Live Now" or "Coming Soon" */}
+            <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-2">
+                {currentIndex === 0 ? (
+                    <span className="px-4 py-1 rounded-full bg-green-100 text-green-700 text-sm font-semibold opacity-80">Live Now</span>
+                ) : (
+                    <span className="px-4 py-1 rounded-full bg-red-100 text-red-700 text-sm font-semibold opacity-80">Coming Soon</span>
+                )}
             </div>
 
+            <ul className="list-disc pl-5 space-y-2 text-gray-300 text-sm">
+                {slides[currentIndex].content.map((item, index) => (
+                    <li className="ml-4 text-left" key={index}>{item}</li>
+                ))}
+            </ul>
+        </div>
 
+        {/* Carousel Controls */}
+        <button onClick={handlePrev} className="absolute left-4 text-gray-300 bg-[#252525] p-2 rounded-full shadow-md hover:bg-gray-500">
+            <ChevronLeftIcon className="w-8 h-8" />
+        </button>
+        <button onClick={handleNext} className="absolute right-4 text-gray-300 bg-[#252525] p-2 rounded-full shadow-md hover:bg-gray-500">
+            <ChevronRightIcon className="w-8 h-8" />
+        </button>
+    </section>
 
-                {/* Carousel Controls */}
-                <button onClick={handlePrev} className="absolute left-4 text-gray-300 bg-[#252525] p-2 rounded-full shadow-md hover:bg-gray-500">
-                    <ChevronLeftIcon className="w-8 h-8" />
-                </button>
-                <button onClick={handleNext} className="absolute right-4 text-gray-300 bg-[#252525] p-2 rounded-full shadow-md hover:bg-gray-500">
-                    <ChevronRightIcon className="w-8 h-8" />
-                </button>
-
-            </section>
-
-            {/* Right Side - Login Form */}
-            <section className="flex flex-col w-1/2 h-full bg-gradient-to-r from-gray-50 to-white p-4 items-center justify-center">
-                <div className="flex flex-col justify-center items-center py-7 w-full bg-[linear-gradient(104deg,#C2FEFE_0.01%,rgba(255,228,199,0.20_99.99%))] rounded-3xl max-w-md">
-                    {/* <img
-                        src="https://cdn.builder.io/api/v1/image/assets/TEMP/f0ef0d0eacbbef38b158bdbbb06ac87201e7e424fed511310bfc0feafe7b5b6b?placeholderIfAbsent=true&apiKey=da64c7fb2ac7418e9138686847c279ae"
-                        alt="InsureBuzz AI Logo"
+    {/* Right Side - Login Form */}
+    <section className="flex flex-col w-full md:w-1/2 h-full bg-gradient-to-r from-gray-50 to-white p-4 items-center justify-center">
+        <div className="flex flex-col justify-center items-center py-7 w-full bg-[linear-gradient(104deg,#C2FEFE_0.01%,rgba(255,228,199,0.20_99.99%))] rounded-3xl max-w-md">
+            <img
+                        src="assets/img/logo.svg"
+                        alt="Banthry AI Logo"
                         className="object-contain w-[200px] mb-8"
-                    /> */}
+                    />
+            <div className='bg-gray-100 w-full p-8 rounded-lg shadow-lg'>
+                <h1 className="text-3xl font-semibold leading-none text-neutral-800 mb-6 text-center">
+                    Login
+                </h1>
 
-                    <div className='bg-gray-100 w-full p-8 rounded-lg w-gull shadow-lg'>
-                        <h1 className="text-3xl font-semibold leading-none text-neutral-800 mb-6 text-center">
-                            Login
-                        </h1>
+                {/* Username Input */}
+                <InputField
+                    label="Username"
+                    placeholder="Enter your username"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                />
 
-                        {/* Username Input */}
-                        <InputField
-                            label="Username"
-                            placeholder="Enter your username"
-                            value={username}
-                            onChange={(e) => setUsername(e.target.value)}
-                        />
+                {/* Password Input */}
+                <InputField
+                    label="Password"
+                    placeholder="Enter your password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                />
 
-                        {/* Password Input */}
-                        <InputField
-                            label="Password"
-                            placeholder="Enter your password"
-                            type="password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                        />
+                {/* Error Message */}
+                {error && <p className="text-red-500 mt-4 text-center">{error}</p>}
 
-                        {/* Error Message */}
-                        {error && <p className="text-red-500 mt-4 text-center">{error}</p>}
+                {/* Login Button */}
+                <LoginButton onClick={handleLogin} />
+            </div>
+        </div>
+    </section>
+</main>
 
-                        {/* Login Button */}
-                        <LoginButton onClick={handleLogin} />
-                    </div>
-                </div>
-            </section>
-        </main>
     );
 };
 
