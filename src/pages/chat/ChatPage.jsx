@@ -430,7 +430,7 @@ const ChatPage = () => {
                 </Transition>
 
                 {/* Main Content */}
-                <div className={`flex-1 h-screen transition-all duration-300 p-4 flex flex-col justify-center items-center rounded-3xl overflow-hidden`}>
+                <div className={`flex-1 h-full transition-all duration-300 p-4 flex flex-col justify-center items-center rounded-3xl overflow-hidden`}>
                     {showChatWindow && (
                         <ChatWindow 
                             openCaseOverlay={openCaseOverlay} 

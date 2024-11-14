@@ -232,35 +232,39 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
     const saveEdit = () => {
         const updatedTextWithPlaceholders = editContent;
         const updatedText = replacePlaceholdersWithReferences(updatedTextWithPlaceholders, editPlaceholders);
+    
+        // Update the `messages` state
         setMessages((prev) => {
             const messagesCopy = [...prev];
             const lastBotIndex = messagesCopy.map(msg => msg.sender).lastIndexOf('model');
-
+            
             if (lastBotIndex !== -1) {
                 messagesCopy[lastBotIndex] = { ...messagesCopy[lastBotIndex], text: updatedText };
             }
-
+            
             return messagesCopy;
         });
-        setEditMode(false);
-        setIsDocumentCollapsed(false);
-
-        if (window.innerWidth < 768) {
-            setIsEditModalOpen(false);
-        }
-
-        // Update activeChat if necessary
+    
+        // Update `activeChat` if necessary
         if (activeChat) {
             setActiveChat(prev => ({
                 ...prev,
-                messages: messages.map(msg => msg.sender === 'model' ? 
-                    (msg.text === initialHistory[0].text ? msg : 
-                        { ...msg, text: msg.text === updatedText ? updatedText : msg.text }
-                    ) : msg
+                messages: prev.messages.map((msg, index) => 
+                    index === prev.messages.map(m => m.sender).lastIndexOf('model')
+                    ? { ...msg, text: updatedText }
+                    : msg
                 )
             }));
         }
+    
+        // Close the edit mode and the modal
+        setEditMode(false);
+        setIsDocumentCollapsed(false);
+        if (window.innerWidth < 768) {
+            setIsEditModalOpen(false);
+        }
     };
+    
 
     // Removed the automatic save useEffect
 
@@ -651,53 +655,54 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
 
                 {/* Edit Mode Modal for Mobile */}
                 {isEditModalOpen && editMode && (
-                    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black bg-opacity-50 md:hidden">
-                        <div className="flex flex-col bg-white rounded-lg p-6 w-11/12 max-w-md">
-                            <div className="flex justify-between items-center mb-4">
-                                <h3 className="text-lg font-bold">Edit Message</h3>
-                                <button
-                                    onClick={() => {
-                                        setEditMode(false);
-                                        setIsDocumentCollapsed(false);
-                                        setIsEditModalOpen(false);
-                                    }}
-                                    className="text-gray-600 hover:text-gray-800 text-xl font-semibold"
-                                >
-                                    &times;
-                                </button>
-                            </div>
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black bg-opacity-30 backdrop-blur-sm md:hidden h-screen">
+        <div className="flex flex-col bg-white rounded-lg p-6 w-11/12 max-w-md overflow-y-auto max-h-[80vh]">
+            <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-bold">Edit Message</h3>
+                <button
+                    onClick={() => {
+                        setEditMode(false);
+                        setIsDocumentCollapsed(false);
+                        setIsEditModalOpen(false);
+                    }}
+                    className="text-gray-600 hover:text-gray-800 text-xl font-semibold"
+                >
+                    &times;
+                </button>
+            </div>
 
-                            <ReactQuill
-                                theme="snow"
-                                value={editContent}
-                                onChange={setEditContent}
-                                modules={{
-                                    toolbar: [
-                                        ['bold', 'italic', 'underline', 'strike'],
-                                        ['link', 'blockquote', 'code-block'],
-                                        [{ 'header': 1 }, { 'header': 2 }],
-                                        [{ 'list': 'ordered' }, { 'list': 'bullet' }],
-                                        [{ 'align': [] }],
-                                        ['clean']
-                                    ],
-                                }}
-                                formats={[
-                                    'header',
-                                    'bold', 'italic', 'underline', 'strike',
-                                    'link', 'blockquote', 'code-block',
-                                    'list', 'bullet', 'align'
-                                ]}
-                                className="relative h-full"
-                            />
-                            <button
-                                onClick={saveEdit}
-                                className="relative m-auto mt-4 px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-500 transition duration-200 w-full"
-                            >
-                                Save
-                            </button>
-                        </div>
-                    </div>
-                )}
+            <ReactQuill
+                theme="snow"
+                value={editContent}
+                onChange={setEditContent}
+                modules={{
+                    toolbar: [
+                        ['bold', 'italic', 'underline', 'strike'],
+                        ['link', 'blockquote', 'code-block'],
+                        [{ 'header': 1 }, { 'header': 2 }],
+                        [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+                        [{ 'align': [] }],
+                        ['clean']
+                    ],
+                }}
+                formats={[
+                    'header',
+                    'bold', 'italic', 'underline', 'strike',
+                    'link', 'blockquote', 'code-block',
+                    'list', 'bullet', 'align'
+                ]}
+                className="relative h-full"
+            />
+            <button
+                onClick={saveEdit}
+                className="relative m-auto mt-4 px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-500 transition duration-200 w-full"
+            >
+                Save
+            </button>
+        </div>
+    </div>
+)}
+
             </div>
 
             {/* Chat Input Area */}
