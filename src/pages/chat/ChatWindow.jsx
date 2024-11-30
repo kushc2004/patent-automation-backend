@@ -727,7 +727,7 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
             <div className="flex items-center px-4 py-2 space-x-3 bg-gray-100">
                 {/* Left Section: Save Chat Button */}
                 <button
-                    onClick={saveChat}
+                    
                     className="bg-gray-700 rounded-full flex items-center justify-center text-white hover:bg-blue-600 transition duration-200 p-2"
                 >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
@@ -760,13 +760,14 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
 
                 {/* Right Section: Guide */}
                 <div className="flex items-center py-2 rounded-full">
-                    <div className='flex items-center px-3 py-2 m-auto rounded-full bg-gray-50 shadow-inner'>
-                        <svg className="w-6 h-6 text-gray-700" fill="currentColor" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+                    <div className='flex items-center px-3 py-2 m-auto rounded-full bg-gray-700 shadow-inner hover:bg-blue-600'
+                        onClick={saveChat}>
+                        <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
                             <title>asterisk</title>
                             <path d="M28.5 22.35l-10.999-6.35 10.999-6.351c0.231-0.131 0.385-0.375 0.385-0.655 0-0.414-0.336-0.75-0.75-0.75-0.142 0-0.275 0.040-0.388 0.108l0.003-0.002-11 6.35v-12.701c0-0.414-0.336-0.75-0.75-0.75s-0.75 0.336-0.75 0.75v0 12.7l-10.999-6.35c-0.11-0.067-0.243-0.106-0.385-0.106-0.414 0-0.75 0.336-0.75 0.75 0 0.28 0.154 0.524 0.381 0.653l0.004 0.002 10.999 6.351-10.999 6.35c-0.226 0.132-0.375 0.374-0.375 0.65 0 0.415 0.336 0.751 0.751 0.751 0 0 0 0 0.001 0h-0c0.138-0.001 0.266-0.037 0.378-0.102l-0.004 0.002 10.999-6.351v12.7c0 0.414 0.336 0.75 0.75 0.75s0.75-0.336 0.75-0.75v0-12.701l11 6.351c0.107 0.063 0.237 0.1 0.374 0.1 0.277 0 0.518-0.149 0.649-0.371l0.002-0.004c0.063-0.108 0.1-0.237 0.1-0.375 0-0.277-0.15-0.518-0.372-0.648l-0.004-0.002z"></path>
                         </svg>
 
-                        <h2 className='mx-2 text-gray-700 font-semibold'>Guide</h2>
+                        <h2 className='mx-2 text-white font-semibold'>Save Chat</h2>
                     </div>
                 </div>
             </div>
