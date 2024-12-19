@@ -13,9 +13,9 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 // Template for generating prompts
 const prompt_template = `
-You are an expert in Legal Assistance and your job is to analyse the User's case and respond to queries by the user. Your name is Banthry AI, and assume yourself as an Legal Assistant. Don't provide any disclaimer or anything. You are an expert in legal assistance that's it.
+You are an expert in Legal Assistance and your job is to respond to queries by the user. Your name is Banthry AI, and assume yourself as an Legal Assistant. Don't provide any disclaimer or anything. You are an expert in legal assistance that's it.
 
-Refer to the Chat History if required.
+Refer to the Chat History if required. The format of your answer should be extremely professional and presentable.
 
 **IMPORTANT NOTE**
 1. You should respond in simple text format. 
@@ -36,16 +36,20 @@ Refer to the Chat History if required.
     ida for Indian Divorce Act
     sma for Special Marriage Act
     ../ and so on
+6. If information is asked for all cases, then create different paragraphs with proper line breaks, highlighting, numbering and bullet points. It should be clearly visible and distinguishable.
 
 Below is the user query:
 {user_query}
+
+Below is the case data:
+{case_data}
 
 Now answer the user query:
 `;
 
 // Client function to interact with Gemini API
 const client = async (prompt, history) => {
-    const apiKey = "AIzaSyBSbMTaBPs5qD13ZBLuyQvvH4MNmOAyG9E"; // Replace with your actual API key
+    const apiKey = "AIzaSyDzl9Xc6JWi0maEyGXiSy-K22-4GBw5w2c"; // Replace with your actual API key
     if (!apiKey) {
         throw new Error("Gemini API key is not set.");
     }
@@ -53,7 +57,7 @@ const client = async (prompt, history) => {
     const genAI = new GoogleGenerativeAI(apiKey);
 
     const model = genAI.getGenerativeModel({
-        model: "gemini-1.5-flash-002",
+        model: "gemini-1.5-flash-8b",
     });
 
     const generationConfig = {
@@ -90,11 +94,11 @@ const client = async (prompt, history) => {
     return result.response.candidates[0].content.parts[0].text;
 };
 
-const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, activeChat }) => {
+const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, activeChat, selectedSearchCases }) => {
     const initialHistory = [
-        { text: "Hello! I am Banthry AI, <br> Here to assist your legal queries. Please select 'For' or 'Against' for an opinion.", sender: 'model' }
+        { text: "Hello! I am Banthry AI, <br> Here to assist your legal queries. Please enter query to search cases.", sender: 'model' }
     ];
-
+    
     const [messages, setMessages] = useState(initialHistory);
     const [opinionDirection, setOpinionDirection] = useState(null);
     const [editMode, setEditMode] = useState(false);
@@ -469,9 +473,11 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
 
         try {
             const filteredHistory = messages.filter(
-                (msg) => msg.text !== "Hello! I am Banthry AI, <br> Here to assist your legal queries. Please select 'For' or 'Against' for an opinion."
+                (msg) => msg.text !== "Hello! I am Banthry AI, <br> Here to assist your legal queries. Please enter query to search cases."
             );
-            const prompt = prompt_template.replace('{user_query}', inputMessage);
+            const prompt = prompt_template
+    .replace('{user_query}', inputMessage)
+    .replace('case_data', JSON.stringify(selectedSearchCases));
             const aiResponse = await client(prompt, filteredHistory);
             console.log("gemini response: ", aiResponse);
             const processedResponse = replaceTagsWithLinks(aiResponse, {});
@@ -544,40 +550,6 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
 
             <ToastContainer />
 
-            {/* Edit Button */}
-            <div className="flex justify-between items-center px-4 py-2 space-x-4">
-                {/* Opinion Toggle Button */}
-                <div className="w-1/3 flex items-center">
-                    <button
-                        onClick={() => handleOpinionSelection(opinionDirection === 'for' ? 'against' : 'for')}
-                        className="flex items-center px-4 py-2 bg-gray-700 rounded-full font-semibold transition duration-200"
-                        style={{ width: 'auto' }}
-                    >
-                        <div
-                            className={`flex items-center justify-center w-6 h-6 rounded-full bg-white transition-all duration-200 ${
-                                opinionDirection === 'for' ? 'translate-x-2' : 'translate-x-0'
-                            }`}
-                        ></div>
-                        <span
-                            className={`ml-2 transition-all duration-200 text-white ${
-                                opinionDirection === 'for' ? 'order-first' : 'order-last'
-                            } text-gray-700`}
-                        >
-                            {opinionDirection === 'for' ? 'In Favor' : 'Against'}
-                        </span>
-                    </button>
-                </div>
-
-                {/* Edit Opinion Button */}
-                {!editMode && (
-                    <button
-                        onClick={enterEditMode}
-                        className="w-1/6 min-w-fit self-end m-4 px-2 text-gray-700 hover:text-gray-800 hover:bg-gray-300 rounded-full bg-white py-2 whitespace-nowrap"
-                    >
-                        ✏️ Edit Opinion
-                    </button>
-                )}
-            </div>
 
             {/* Main Chat Area */}
             <div className="flex-1 flex overflow-hidden">
@@ -592,22 +564,7 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
                                 onReferenceClick={onReferenceClick}
                             />
                         ))}
-                        {!activeChat && showOpinionButtons && (
-                            <div className="relative flex justify-start space-x-4 mt-0 ml-8 -top-2">
-                                <button
-                                    onClick={() => handleOpinionSelection('for')}
-                                    className="px-4 py-2 bg-gray-700 text-white font-semibold rounded-lg hover:bg-green-600 transition"
-                                >
-                                    For
-                                </button>
-                                <button
-                                    onClick={() => handleOpinionSelection('against')}
-                                    className="px-4 py-2 bg-gray-700 text-white font-semibold rounded-lg hover:bg-red-600 transition"
-                                >
-                                    Against
-                                </button>
-                            </div>
-                        )}
+
                         <div ref={chatContainerRef} />
                     </div>
 

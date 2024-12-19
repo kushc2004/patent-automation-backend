@@ -108,7 +108,7 @@ useEffect(() => {
     
         try {
             const response = await axios.post(
-                'https://legalai-backend.onrender.com/api/chat-login',
+                'https://legalai-backend-1.onrender.comapi/chat-login',
                 { username, password },
                 {
                     headers: {

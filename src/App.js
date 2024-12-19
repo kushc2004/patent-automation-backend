@@ -5,6 +5,7 @@ import './App.css';
 import ChatPage from './pages/chat/ChatPage';
 import CaseForm from './pages/CaseForm';
 import ChatLoginPage from './pages/chat/ChatLoginPage';
+import SelectPage from './pages/SelectPage';
 
 function App() {
   const [user, setUser] = useState(null);
@@ -20,6 +21,7 @@ function App() {
     <Route path="/" element={<ChatLoginPage />} />
     <Route path="/chat-form" element={<CaseForm />} />
     <Route path="/chat" element={<ChatPage />} />
+    <Route path="/select" element={<SelectPage />} />
     <Route path="*" element={<Navigate to="/" />} />
   </Routes>
 </Router>
