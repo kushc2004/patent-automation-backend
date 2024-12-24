@@ -30,7 +30,7 @@ const SelectPage = () => {
 
             // Fetch Chat Histories from Backend
             try {
-                const response = await axios.get('https://legalai-backend-1.onrender.comapi/get_chat_histories', { withCredentials: true });
+                const response = await axios.get('https://legalai-backend-1.onrender.com/api/get_chat_histories', { withCredentials: true });
                 if (response.data.chat_histories) {
                     setChatHistories(response.data.chat_histories);
                 }

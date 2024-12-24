@@ -11,7 +11,57 @@ import DOMPurify from 'dompurify';
 
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 
-// Template for generating prompts
+
+// const prompt_template = `
+// You are an expert in Legal Assistance and your job is to respond to queries by the user. Your name is Banthry AI, and assume yourself as an Legal Assistant. Don't provide any disclaimer or anything. You are an expert in legal assistance that's it.
+
+// Refer to the Chat History if required. The format of your answer should be extremely professional and presentable.
+
+// **IMPORTANT NOTE**
+// 1. You should respond in simple text format. 
+// 2. You should use <li>, <b>, <br> tags for formatting instead of new line character and *, ** tags.
+// 3. You should always answer according to rules and regulations of India and should always include referencing to backup your statements.
+// 4. **MOST IMPORTANT**: You should include the following tags in your every response whenever you are referring to anything (so that the backend can process this and create reference badges).
+//         FORMAT: <code:code_name:section_number>
+//         there should be only one Section number. If you want multiple sections then add multiple <> tags.
+
+//         Example: In the Criminal Penal Code Section 17 <code:crpc:17> this means it is referring to section 17 of CrPC.
+//         Example acts/codes: <code:hma:17> this means section 17 of Hindu Marriage Act.
+//         <code:dva:23> this means section 23 of Domestic Violence Act.
+//         <code:ipc:241> this means section 241 of India Penal Code
+
+//         ** In case you want to refer to the whole Act, use section_number as 1.
+// 5. Use the acts from following list:
+//     ipc for Indian Penal Code
+//     crpc for Criminal Penal Code
+//     dva for Domestic Violence Act
+//     hma for Hindu Marriage Act
+//     ida for Indian Divorce Act
+//     sma for Special Marriage Act
+//     cpc: "Code of Civil Procedure",
+//     bns: "Bengal Nuisance Act",
+//     iea: "Indian Evidence Act",
+//     mva: "Motor Vehicles Act",
+//     nia: "Negotiable Instruments Act"
+//     public_worship_act: Kerala Hindu Places of Public Worship (Authorisation of Entry) Act
+//     indian_constitution: Indian Constitution. Give referencing as 
+
+//     ../ and so on
+
+// 6. When referring to a case you should refer as: <case_id:id>: Example: Cases like Navneet Arora vs Surender Kaur & Ors. <case_id:134312774> support the wife's right to reside in the matrimonial home
+//     **NOTE** The case id can be of format a number 134312774 or a code like [1981] Supp SCC 87 or [2021] 7 SCR 571. you should give this as <case_id:[2021] 7 SCR 571>.
+
+// 7. If information is asked for all cases, then create different paragraphs with proper line breaks, highlighting, numbering and bullet points. It should be clearly visible and distinguishable.
+
+// Below is the user query:
+// {user_query}
+
+// Below is the case data:
+// {case_data}
+
+// Now answer the user query & ensure accurate referencing is done in every response. Read all instructions again:
+// `;
+
 const prompt_template = `
 You are an expert in Legal Assistance and your job is to respond to queries by the user. Your name is Banthry AI, and assume yourself as an Legal Assistant. Don't provide any disclaimer or anything. You are an expert in legal assistance that's it.
 
@@ -19,24 +69,43 @@ Refer to the Chat History if required. The format of your answer should be extre
 
 **IMPORTANT NOTE**
 1. You should respond in simple text format. 
-2. You should use <li>, <b>, <br> tags for formatting instead of new line character and *, ** tags.
+2. You should use <li>, <b>, <br> tags and different numbering/bullet points, indentation for formatting instead of new line character and *, ** tags.
 3. You should always answer according to rules and regulations of India and should always include referencing to backup your statements.
-4. You should include the following tags in your opinion whenever you are referring to anything (so that the backend can process this and create reference badges).
-        <code:code_name:section_number>: Example: In the Criminal Penal Code Section 17 <code:crpc:17> this means it is referring to section 17 of CrPC.
+4. **MOST IMPORTANT**: You should include the following tags in your every response whenever you are referring to anything (so that the backend can process this and create reference badges).
+        FORMAT: <code:code_name:section_numbers>
+        - For most acts, 'section_numbers' should be a single number.
+        - **For Indian Constitution references**, 'section_numbers' can include multiple article numbers separated by commas (e.g., '14,15,16').
+    
+        Example: In the Criminal Penal Code Section 17 <code:crpc:17> this means it is referring to section 17 of CrPC.
         Example acts/codes: <code:hma:17> this means section 17 of Hindu Marriage Act.
         <code:dva:23> this means section 23 of Domestic Violence Act.
-        <code:ipc:241> this means section 241 of India Penal Code
-
-        In case you want to refer to the whole Act, use section_number as 1 instead of NA.
-5. Use:
+        <code:ipc:241> this means section 241 of India Penal Code.
+        <code:indian_constitution:14,15,16> this means Articles 14, 15, and 16 of the Indian Constitution. Directly give these tags instead of mentioning article numbers and tags seperately.
+    
+        ** In case you want to refer to the whole Act, use section_number as 1.
+5. Use the acts from following list:
     ipc for Indian Penal Code
     crpc for Criminal Penal Code
     dva for Domestic Violence Act
     hma for Hindu Marriage Act
     ida for Indian Divorce Act
     sma for Special Marriage Act
-    ../ and so on
-6. If information is asked for all cases, then create different paragraphs with proper line breaks, highlighting, numbering and bullet points. It should be clearly visible and distinguishable.
+    cpc: "Code of Civil Procedure",
+    bns: "Bengal Nuisance Act",
+    iea: "Indian Evidence Act",
+    mva: "Motor Vehicles Act",
+    nia: "Negotiable Instruments Act"
+    public_worship_act: Kerala Hindu Places of Public Worship (Authorisation of Entry) Act
+    indian_constitution: Indian Constitution. Give referencing as 
+    
+        ../ and so on
+
+6. When referring to a case you should refer as: <case_id:id>: Example: Cases like Navneet Arora vs Surender Kaur & Ors. <case_id:134312774> support the wife's right to reside in the matrimonial home
+    **NOTE** The case id can be of format a number 134312774 or a code like [1981] Supp SCC 87 or [2021] 7 SCR 571. you should give this as <case_id:[2021] 7 SCR 571>.
+
+7. If information is asked for all cases, then create different paragraphs with proper line breaks, highlighting, numbering and bullet points. It should be clearly visible and distinguishable.
+
+8. Dont give doc link in response
 
 Below is the user query:
 {user_query}
@@ -44,10 +113,10 @@ Below is the user query:
 Below is the case data:
 {case_data}
 
-Now answer the user query:
+Now answer the user query & ensure accurate referencing is done in every response. Read all instructions again:
 `;
 
-// Client function to interact with Gemini API
+
 const client = async (prompt, history) => {
     const apiKey = "AIzaSyDzl9Xc6JWi0maEyGXiSy-K22-4GBw5w2c"; // Replace with your actual API key
     if (!apiKey) {
@@ -86,13 +155,99 @@ const client = async (prompt, history) => {
         parts: msg.text.split('\n').map(part => ({ text: part }))
     })));
 
-    console.log("prompt: ", prompt);
+    // console.log("prompt: ", prompt);
 
     const result = await chatSession.sendMessage(prompt);
 
     console.log(result);
     return result.response.candidates[0].content.parts[0].text;
 };
+
+
+// const client = async (prompt, history, files = []) => {
+//     const apiKey = "AIzaSyDzl9Xc6JWi0maEyGXiSy-K22-4GBw5w2c"; // Replace with your actual API key
+//     if (!apiKey) {
+//       throw new Error("Gemini API key is not set.");
+//     }
+  
+//     const genAI = new GoogleGenerativeAI(apiKey);
+  
+//     const model = genAI.getGenerativeModel({
+//       model: "gemini-1.5-flash-8b",
+//     });
+  
+//     const generationConfig = {
+//       temperature: 1,
+//       topP: 0.95,
+//       topK: 40,
+//       maxOutputTokens: 8192,
+//       responseMimeType: "text/plain",
+//     };
+  
+//     const arrayBufferToBase64 = (buffer) => {
+//       let binary = '';
+//       const bytes = new Uint8Array(buffer);
+//       const len = bytes.byteLength;
+//       for (let i = 0; i < len; i++) {
+//         binary += String.fromCharCode(bytes[i]);
+//       }
+//       return window.btoa(binary);
+//     };
+  
+//     const filePromises = files.map(async (file) => {
+//       const response = await fetch(file.url, { cache: "no-cache" });
+//       if (!response.ok) {
+//         throw new Error(`Failed to fetch file: ${file.name}`);
+//       }
+//       const arrayBuffer = await response.arrayBuffer();
+//       const base64Data = arrayBufferToBase64(arrayBuffer);
+//       console.log(`File ${file.name} Base64:`, base64Data.slice(0, 100)); // Log first 100 characters of Base64 for debugging
+//       return {
+//         mimeType: file.mimeType,
+//         base64: base64Data,
+//         name: file.name,
+//       };
+//     });
+  
+//     const inlineFiles = await Promise.all(filePromises);
+  
+//     console.log("Inline files prepared for Gemini:", inlineFiles);
+  
+//     const chatSession = model.startChat({
+//       generationConfig,
+//       history: [
+//         ...history
+//           .filter((msg) => msg.text.trim() !== "")
+//           .map((msg) => ({
+//             role: msg.sender === "user" ? "user" : "model",
+//             parts: msg.text
+//               .split("\n")
+//               .filter((part) => part.trim() !== "")
+//               .map((part) => ({ text: part })),
+//           })),
+//         {
+//           role: "user",
+//           parts: [
+//             ...inlineFiles.map((file) => ({
+//               inlineData: {
+//                 data: file.base64,
+//                 mimeType: file.mimeType,
+//               },
+//             })),
+//             { text: prompt },
+//           ],
+//         },
+//       ],
+//     });
+  
+//     const result = await chatSession.sendMessage(prompt);
+  
+//     console.log("Response from Gemini client:", result);
+//     return result.response.candidates[0].content.parts[0].text;
+//   };
+  
+
+
 
 const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, activeChat, selectedSearchCases }) => {
     const initialHistory = [
@@ -114,8 +269,20 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
     const [isTyping, setIsTyping] = useState(false);
     const [showOpinionButtons, setShowOpinionButtons] = useState(true);
     const [caseCategory, setCaseCategory] = useState('');
-
+    const [showDropdown, setShowDropdown] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+
+    useEffect(() => {
+        window.addEventListener("beforeunload", () => {
+            localStorage.removeItem("savedSearchFiles");
+        });
+    
+        return () => {
+            window.removeEventListener("beforeunload", () => {
+                localStorage.removeItem("savedSearchFiles");
+            });
+        };
+    }, []);
 
     useEffect(() => {
         if (chatContainerRef.current) {
@@ -222,12 +389,49 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
     };
 
     // Helper function to replace placeholders with references
-    const replacePlaceholdersWithReferences = (text, placeholderMap) => {
-        let modifiedText = text;
-        console.log("Text with placeholders:", modifiedText);  // Confirm placeholders in text
-        console.log("Placeholder Map:", placeholderMap);        // Confirm placeholders in map
+    // const replacePlaceholdersWithReferences = (text, placeholderMap) => {
+    //     let modifiedText = text;
+    //     console.log("Text with placeholders:", modifiedText);  // Confirm placeholders in text
+    //     console.log("Placeholder Map:", placeholderMap);        // Confirm placeholders in map
 
-        Object.entries(placeholderMap).forEach(([placeholder, ref]) => {
+    //     Object.entries(placeholderMap).forEach(([placeholder, ref]) => {
+    //         // Encode any special characters in ref.text
+    //         const encodedRefText = encodeHtmlEntities(ref.text);
+
+    //         const replacement = ref?.type === 'case'
+    //             ? `<span data-ref-case="${ref.id}" class="reference-badge" style="cursor:pointer;color:blue;">${encodedRefText}</span>`
+    //             : `<span data-ref-code="${ref.act}" data-ref-section="${ref.section}" class="reference-badge" style="cursor:pointer;color:blue;">${encodedRefText}</span>`;
+
+    //         // Escape the placeholder text for use in a regular expression
+    //         const escapedPlaceholder = placeholder.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
+
+    //         // Create a new regular expression with the global flag to match all occurrences
+    //         const regex = new RegExp(escapedPlaceholder, 'g');
+
+    //         // Replace all instances of the placeholder with the replacement text
+    //         modifiedText = modifiedText.replace(regex, replacement);
+    //     });
+
+    //     console.log("After replacement:", modifiedText);
+    //     return modifiedText;
+    // };
+
+    // Helper function to replace placeholders with references
+const replacePlaceholdersWithReferences = (text, placeholderMap) => {
+    let modifiedText = text;
+    console.log("Text with placeholders:", modifiedText);  // Confirm placeholders in text
+    console.log("Placeholder Map:", placeholderMap);        // Confirm placeholders in map
+
+    Object.entries(placeholderMap).forEach(([placeholder, ref]) => {
+        if (ref.act === 'indian_constitution') {
+            // Split multiple articles if present
+            const articles = ref.section.split(',').map(article => article.trim());
+            const highlightedArticles = articles.map(article => 
+                `<span data-ref-code="${ref.act}" data-ref-section="${article}" class="reference-badge" style="cursor:pointer;color:blue;">Article ${article}</span>`
+            ).join(', ');
+            // Replace the placeholder with the highlighted articles
+            modifiedText = modifiedText.replace(new RegExp(placeholder, 'g'), highlightedArticles);
+        } else {
             // Encode any special characters in ref.text
             const encodedRefText = encodeHtmlEntities(ref.text);
 
@@ -243,11 +447,13 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
 
             // Replace all instances of the placeholder with the replacement text
             modifiedText = modifiedText.replace(regex, replacement);
-        });
+        }
+    });
 
-        console.log("After replacement:", modifiedText);
-        return modifiedText;
-    };
+    console.log("After replacement:", modifiedText);
+    return modifiedText;
+};
+
 
     // Enter edit mode by extracting plain text and references
     const enterEditMode = async () => {
@@ -305,78 +511,19 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
         }
     };
 
-    const handleOpinionSelection = async (direction) => {
-        setOpinionDirection(direction);
-        setShowOpinionButtons(false);  // Hide buttons after selection
-        const userMessage = `I would like an opinion ${direction === 'for' ? 'in favor' : 'against'} the case.`;
-        setMessages((prev) => [
-            ...prev,
-            { text: userMessage, sender: 'user' },
-            { text: `Generating opinion ${direction === 'for' ? 'in favor' : 'against'} the case...`, sender: 'model' },
-        ]);
-
-        try {
-            const storedData = JSON.parse(sessionStorage.getItem("caseFormData")) || {};
-            const { facts, category, caseState, document } = storedData;
-
-            const formData = new FormData();
-            formData.append("query", facts);
-            formData.append("category", category);
-            formData.append("status", caseState);
-            formData.append("opinion_direction", direction);
-            setCaseCategory(category);
-            
-            // Append each file to formData
-            document.forEach((file, index) => {
-                formData.append(`file_${index}`, file.data); // Ensure data format matches backend needs
-            });
-
-            const textresponse = await axios.post('https://legalai-backend-1.onrender.comapi/generate_opinion', formData, {
-                headers: {
-                    'Content-Type': 'multipart/form-data',
-                },
-            });
-
-            const response = JSON.parse(textresponse.data.opinion);
-            console.log(response);
-
-            const refCases = response.ref_case || {};
-            setCaseRef(refCases);
-
-            if (Object.keys(refCases).length > 0) {
-                const texts = await Promise.all(Object.keys(refCases).map(id => fetchCaseText(id, refCases[id])));
-                const caseTextMap = Object.keys(refCases).reduce((acc, id, index) => {
-                    acc[id] = texts[index];
-                    return acc;
-                }, {});
-                setCaseTexts(caseTextMap);
-            } else {
-                setCaseTexts({});
-            }
-
-            const processedOpinion = replaceTagsWithLinks(response.opinion, refCases); // Pass refCases as argument
-            setMessages((prev) => [
-                ...prev,
-                { text: processedOpinion, sender: 'model' },
-            ]);
-
-            // Update activeChat if necessary
-            if (activeChat) {
-                setActiveChat(prev => ({
-                    ...prev,
-                    messages: [...prev.messages, { text: processedOpinion, sender: 'model' }]
-                }));
-            }
-
-        } catch (error) {
-            console.error("Error:", error.message);
-            toast.error("Error generating opinion. Please try again.");
-        }
+    const handleQuestionSelect = (question) => {
+        setShowDropdown(false); // Close the dropdown
+        setInputMessage(question); // Set the input message to the selected question
     };
+    
+    
+    
+    
+    
 
     const fetchCaseText = async (caseId, highlightIndexes) => {
         try {
-            const response = await axios.get(`https://legalai-backend-1.onrender.comfetch-case-text/${caseId}`);
+            const response = await axios.get(`https://legalai-backend-1.onrender.com/fetch-case-text/${caseId}`);
             const caseText = response.data;
 
             // Split the text into paragraphs and add highlighting for specific indexes
@@ -393,7 +540,7 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
 
     const fetchCodeText = async (act, section) => {
         try {
-            const response = await axios.get(`https://legalai-backend-1.onrender.comfetch-code-text/${act}/${section.split('(')[0]}`);
+            const response = await axios.get(`https://legalai-backend-1.onrender.com/fetch-code-text/${act}/${section.split('(')[0]}`);
             return response.data.content;
         } catch (error) {
             console.error("Error fetching code text:", error);
@@ -403,7 +550,7 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
 
     const fetchCaseTitle = async(caseId) => {
         try {
-            const response = await axios.get(`https://legalai-backend-1.onrender.comfetch-case-title/${caseId}`);
+            const response = await axios.get(`https://legalai-backend-1.onrender.com/fetch-case-title/${caseId}`);
             const data = response.data;
     
             if (data.error) {
@@ -420,18 +567,43 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
         }
     }
 
+    // const replaceTagsWithLinks = (opinionText, caseRef) => {
+    //     const caseIds = Object.keys(caseRef);
+        
+    //     return opinionText
+    //         .replace(/<case_id:(\w+)>/g, (match, caseId) => {
+    //             const caseIndex = caseIds.indexOf(caseId) !== -1 ? caseIds.indexOf(caseId) + 1 : '?';
+    //             return `<span data-ref-case="${caseId}" class="reference-badge" style="cursor:pointer;color:blue;">Case ${caseIndex}</span>`;
+    //         })
+    //         .replace(/<code:(\w+):([\w()\s]+)>/g, (match, act, section) => { // Allow spaces and parentheses
+    //             return `<span data-ref-code="${act}" data-ref-section="${section}" class="reference-badge" style="cursor:pointer;color:blue;">${act} Section: ${section}</span>`;
+    //         });
+    // };
+
+
     const replaceTagsWithLinks = (opinionText, caseRef) => {
         const caseIds = Object.keys(caseRef);
         
         return opinionText
-            .replace(/<case_id:(\w+)>/g, (match, caseId) => {
+            .replace(/<case_id:([\w\[\]\s]+)>/g, (match, caseId) => {
                 const caseIndex = caseIds.indexOf(caseId) !== -1 ? caseIds.indexOf(caseId) + 1 : '?';
                 return `<span data-ref-case="${caseId}" class="reference-badge" style="cursor:pointer;color:blue;">Case ${caseIndex}</span>`;
             })
-            .replace(/<code:(\w+):([\w()\s]+)>/g, (match, act, section) => { // Allow spaces and parentheses
-                return `<span data-ref-code="${act}" data-ref-section="${section}" class="reference-badge" style="cursor:pointer;color:blue;">${act} Section: ${section}</span>`;
+            .replace(/<code:(\w+):([\w(),\s]+)>/g, (match, act, section) => { // Allow commas for multiple sections
+                if (act === 'indian_constitution') {
+                    // Split the sections by comma and trim whitespace
+                    const articles = section.split(',').map(article => article.trim());
+                    // Create spans for each article
+                    const highlightedArticles = articles.map(article => 
+                        `<span data-ref-code="${act}" data-ref-section="${article}" class="reference-badge" style="cursor:pointer;color:blue;">Article ${article}</span>`
+                    ).join(', ');
+                    return highlightedArticles;
+                } else {
+                    return `<span data-ref-code="${act}" data-ref-section="${section}" class="reference-badge" style="cursor:pointer;color:blue;">${act.toUpperCase()} Section: ${section}</span>`;
+                }
             });
     };
+    
 
     // Function to Handle Reference Clicks
     const handleReferenceClick = ({ type, id, act, section }) => {
@@ -472,14 +644,47 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
         }
 
         try {
+
+            const arrayBufferToBase64 = (buffer) => {
+                let binary = '';
+                const bytes = new Uint8Array(buffer);
+                const len = bytes.byteLength;
+                for (let i = 0; i < len; i++) {
+                    binary += String.fromCharCode(bytes[i]);
+                }
+                return window.btoa(binary);
+            };
+
             const filteredHistory = messages.filter(
                 (msg) => msg.text !== "Hello! I am Banthry AI, <br> Here to assist your legal queries. Please enter query to search cases."
             );
+            
             const prompt = prompt_template
-    .replace('{user_query}', inputMessage)
-    .replace('case_data', JSON.stringify(selectedSearchCases));
-            const aiResponse = await client(prompt, filteredHistory);
-            console.log("gemini response: ", aiResponse);
+                .replace('{user_query}', inputMessage)
+                .replace('case_data', JSON.stringify(selectedSearchCases));
+            
+            const savedFiles = JSON.parse(localStorage.getItem("savedSearchFiles")) || [];
+            console.log(savedFiles);
+            
+            const filePromises = savedFiles.map(async (file) => {
+                const response = await fetch(file.url, { cache: 'no-cache' });
+                const buffer = await response.arrayBuffer();
+                return {
+                    name: file.originalName,
+                    base64: arrayBufferToBase64(buffer),
+                    mimeType: file.type,
+                };
+            });
+            
+            const filesForGemini = await Promise.all(filePromises);
+            
+            console.log("Files being sent to Gemini client:", filesForGemini);
+            
+            const aiResponse = await client(prompt, filteredHistory, filesForGemini);
+            
+            console.log("Gemini response:", aiResponse);
+            
+            
             const processedResponse = replaceTagsWithLinks(aiResponse, {});
             if (aiResponse) {
                 // Sanitize the processed response
@@ -517,7 +722,7 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
         }
     
         try {
-            const response = await axios.post('https://legalai-backend-1.onrender.comapi/save_chat_history', {
+            const response = await axios.post('https://legalai-backend-1.onrender.com/api/save_chat_history', {
                 chat_history: messages,
                 chat_title: activeChat?.title || `${caseCategory}: ${new Date().toLocaleString()}`
             }, {
@@ -682,19 +887,69 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
 
             {/* Chat Input Area */}
             <div className="flex items-center px-4 py-2 space-x-3 bg-gray-100">
-                {/* Left Section: Save Chat Button */}
-                <button
-                    
-                    className="bg-gray-700 rounded-full flex items-center justify-center text-white hover:bg-blue-600 transition duration-200 p-2"
-                >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M5 3a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V7.414a2 2 0 00-.586-1.414l-4-4A2 2 0 0014.586 2H5zm4 14a1 1 0 112 0 1 1 0 01-2 0zm0-4a1 1 0 012 0v3h2v-3a1 1 0 112 0v3h2v-5H9v5zM13 6V4h1.586L17 6.414V8h-4V6z"/>
-                    </svg>
-                </button>
+            
+
+            <div className="relative">
+    <button
+        className="bg-gray-700 rounded-full flex items-center justify-center text-white hover:bg-blue-600 transition duration-200 p-2"
+        onClick={() => setShowDropdown((prev) => !prev)}
+    >
+        {/* Icon: Chat bubble with question mark */}
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 20.25c4.556 0 8.25-3.694 8.25-8.25s-3.694-8.25-8.25-8.25-8.25 3.694-8.25 8.25a8.193 8.193 0 002.248 5.673c-.093.463-.25 1.17-.517 1.908.811-.11 1.811-.33 2.453-.602a8.23 8.23 0 005.816 2.271z" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M10.25 8.5a1.75 1.75 0 113.5 0c0 .871-.71 1.576-1.464 2.23-.616.544-.786.846-.786 1.27m.002 1.75h.007" />
+        </svg>
+    </button>
+    {showDropdown && (
+        <ul className="absolute bottom-full mb-2 bg-white shadow-lg rounded-lg py-2 w-48 text-sm text-gray-700">
+            <li 
+                className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                onClick={() => handleQuestionSelect("What are the case details?")}
+            >
+                Case Details
+            </li>
+            <li 
+                className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                onClick={() => handleQuestionSelect("What is the case summary?")}
+            >
+                Case Summary
+            </li>
+            <li 
+                className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                onClick={() => handleQuestionSelect("What is the judgement?")}
+            >
+                Judgement
+            </li>
+            <li 
+                className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                onClick={() => handleQuestionSelect("What are the legal precedents for this case?")}
+            >
+                Legal Precedents
+            </li>
+            <li 
+                className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                onClick={() => handleQuestionSelect("What sections are referenced in this case?")}
+            >
+                Section References
+            </li>
+            <li 
+                className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                onClick={() => handleQuestionSelect("Can you provide a detailed case analysis?")}
+            >
+                Case Analysis
+            </li>
+        </ul>
+    )}
+</div>
+
+
+
+
+
 
                 {/* Middle Section: Chat Input */}
                 <form onSubmit={sendMessage} className="flex items-center space-x-4 bg-white px-4 py-2 rounded-full flex-1 shadow-inner">
-                    <span className="text-gray-500 text-sm">{Object.keys(fileUrls).length} Files</span>
+                    <span className="text-gray-500 text-sm">{Object.keys(selectedSearchCases).length} Cases</span>
 
                     <input
                         type="text"

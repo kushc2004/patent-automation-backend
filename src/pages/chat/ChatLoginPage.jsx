@@ -108,7 +108,7 @@ useEffect(() => {
     
         try {
             const response = await axios.post(
-                'https://legalai-backend-1.onrender.comapi/chat-login',
+                'https://legalai-backend-1.onrender.com/api/chat-login',
                 { username, password },
                 {
                     headers: {
@@ -124,7 +124,7 @@ useEffect(() => {
             }
     
             console.log('Login successful:', response.data);
-            navigate('/chat-form');
+            navigate('/chat');
         } catch (error) {
             console.error('Login error:', error);
             setError('Invalid username or password.');

@@ -9,6 +9,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import axios from 'axios';
 import { Transition } from '@headlessui/react'; // For smooth transitions
 import { MenuIcon, XIcon } from '@heroicons/react/outline'; // Icons for menu
+import { useNavigate } from 'react-router-dom';
 
 const ChatPage = () => {
     const [files, setFiles] = useState([]);
@@ -24,21 +25,37 @@ const ChatPage = () => {
     const [activeChat, setActiveChat] = useState(null); // { title, messages }
     const [selectedOption, setSelectedOption] = useState(null);
     const [selectedSearchCases, setSelectedSearchCases] = useState([]);
+    const navigate = useNavigate();
 
     const handleOptionSelect = (option) => {
-        setSelectedOption(option);
+        if (option === 'getOpinion') {
+            navigate('/chat-form');
+        } else {
+            setSelectedOption(option);
+        }
     };
 
     useEffect(() => {
+
+        // sessionStorage.removeItem("getOpinion");
+        setSelectedOption(null);
+
         const fetchInitialData = async () => {
             const storedData = JSON.parse(sessionStorage.getItem("caseFormData")) || {};
             const uploadedFiles = storedData.document || [];
             setFiles(uploadedFiles);
             setShowChatWindow(true);
 
+            // Check if the selectedOption was saved and set it
+            if (storedData.selectedOption) {
+                setSelectedOption(storedData.selectedOption);
+            } else {
+                setShowChatWindow(true);
+            }
+
             // Fetch Chat Histories from Backend
             try {
-                const response = await axios.get('https://legalai-backend-1.onrender.comapi/get_chat_histories', { withCredentials: true });
+                const response = await axios.get('https://legalai-backend-1.onrender.com/api/get_chat_histories', { withCredentials: true });
                 if (response.data.chat_histories) {
                     setChatHistories(response.data.chat_histories);
                 }
@@ -186,6 +203,7 @@ const ChatPage = () => {
                             setIsCaseOverlayOpen={setIsCaseOverlayOpen}
                             setSelectedSearchCases={setSelectedSearchCases}
                             overlayContent={overlayContent}
+                            setSelectedOption={setSelectedOption}
                         >
                             </SearchPanel>
                     </div>
@@ -194,9 +212,24 @@ const ChatPage = () => {
                     <div>
                         {/* Sidebar for Desktop */}
                         <div className={`hidden md:block transition-all duration-300  bg-[#EFF3F6] p-4 rounded-2xl my-4 mx-2 overflow-y-auto flex-shrink-0`}>
-                            <button onClick={toggleDocumentCollapse} className="text-gray-500 hover:text-gray-700 mb-4 focus:outline-none">
+                        <div className="flex items-center space-x-4 mb-4">
+                            {/* Back Button */}
+                            <button
+                                onClick={() => setSelectedOption(null)} // Go back to the option selection screen
+                                className="bg-gray-700 text-white px-4 py-2 rounded-lg shadow-md hover:bg-blue-600 focus:outline-none"
+                            >
+                                Back
+                            </button>
+
+                            {/* Collapse Button */}
+                            <button
+                                onClick={toggleDocumentCollapse}
+                                className="text-gray-500 hover:text-gray-700 focus:outline-none"
+                            >
                                 {isDocumentCollapsed ? <span>➡️ Expand</span> : <span>⬅️ Collapse</span>}
                             </button>
+                        </div>
+
                             {!isDocumentCollapsed && (
                                 <>
                                     {!isCaseOverlayOpen ? (

@@ -74,6 +74,7 @@ function CaseForm() {
             caseState: caseState === "Other" ? customCaseState : caseState,
             facts,
             document: uploadedFiles,
+            selectedOption: "getOpinion",
         };
 
         // if (!name || !formData.state || !formData.city || !formData.category || !formData.caseState || !facts || !acceptedTerms) {
@@ -92,6 +93,27 @@ function CaseForm() {
     return (
         <section className="flex justify-center items-center min-h-screen bg-gray-100 p-5">
             <div className="bg-gray-50 shadow-lg rounded-2xl w-full max-w-3xl p-8 space-y-6">
+            <button
+            type="button"
+            onClick={() => navigate(-1)} // Navigate to the previous page
+            className="flex items-center space-x-2 text-gray-700 hover:text-gray-900 mb-4 focus:outline-none"
+        >
+            <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth="1.5"
+                stroke="currentColor"
+                className="w-5 h-5"
+            >
+                <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M15.75 19.5L8.25 12l7.5-7.5"
+                />
+            </svg>
+            <span>Back</span>
+        </button>
                 <h1 className="text-2xl font-bold text-center text-gray-800">
                     Welcome to Banthry: Your AI Legal Companion
                 </h1>
