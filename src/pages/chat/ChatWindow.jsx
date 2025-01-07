@@ -376,7 +376,7 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
             const caseText = response.data;
 
             // Split the text into paragraphs and add highlighting for specific indexes
-            const paragraphs = caseText.paragraphs.map((para, index) =>
+            const paragraphs = caseText.paragraphs[1].split('\n').map((para, index) =>
                 highlightIndexes.includes(index) ? `<span style="background-color: #f9f9128a;">${para}</span>` : para
             );
 
