@@ -178,7 +178,7 @@ const ChatPage = () => {
                         : isCaseOverlayOpen
                             ? 'w-1/2'
                             : 'w-1/4'
-                } bg-gray-100 p-4`}>
+                } bg-gray-100 p-4 overflow-y-auto`}>
                 {!selectedOption && (
                     <div className="flex flex-col space-y-4">
                         <button
