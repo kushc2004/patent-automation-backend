@@ -327,7 +327,7 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
                 formData.append(`file_${index}`, file.data); // Ensure data format matches backend needs
             });
 
-            const textresponse = await axios.post('https://legalai-backend-1.onrender.com/api/generate_opinion', formData, {
+            const textresponse = await axios.post('https://legalai-backend.onrender-1.com/api/generate_opinion', formData, {
                 headers: {
                     'Content-Type': 'multipart/form-data',
                 },
