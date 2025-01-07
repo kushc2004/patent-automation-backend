@@ -420,7 +420,7 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
         const caseIds = Object.keys(caseRef);
         
         return opinionText
-            .replace(/<case_id:(\w+)>/g, (match, caseId) => {
+            .replace(/<case_id:([\w\s.\[\]()-]+)>/g, (match, caseId) => {
                 const caseIndex = caseIds.indexOf(caseId) !== -1 ? caseIds.indexOf(caseId) + 1 : '?';
                 return `<span data-ref-case="${caseId}" class="reference-badge" style="cursor:pointer;color:blue;">Case ${caseIndex}</span>`;
             })
