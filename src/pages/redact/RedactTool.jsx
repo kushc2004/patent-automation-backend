@@ -23,6 +23,7 @@ const RedactTool = () => {
     const [redactedStrings, setRedactedStrings] = useState([]);
     const [pdfBlobUrl, setPdfBlobUrl] = useState(null); // To store the blob URL for the PDF
     const [redactedWords, setRedactedWords] = useState([]);
+    const [keywordsWithCoordinates, setKeywordsWithCoordinates] = useState([]);
 
     // Cleanup the blob URL when the component unmounts or selectedFile changes
     useEffect(() => {
@@ -81,92 +82,53 @@ const RedactTool = () => {
         }
     };
 
+    // const handleAddText = () => {
+    //     setRedactedWords([...redactedWords, ""]);
+    // };
+
+    // const handleUpdateText = (index, newValue) => {
+    //     const updatedStrings = [...redactedWords];
+    //     updatedStrings[index] = newValue;
+    //     setRedactedWords(updatedStrings);
+    // };
+
+    // const handleRemoveText = (index) => {
+    //     const updatedStrings = redactedWords.filter((_, i) => i !== index);
+    //     setRedactedWords(redactedWords);
+    // };
+
     const handleAddText = () => {
-        setRedactedWords([...redactedWords, ""]);
+        const newRedactedWords = [...redactedWords, ""]; // Add a placeholder for the new text
+        setRedactedWords(newRedactedWords);
+    
+        // Update the tags array with the new redacted words, avoiding duplicates
+        setTags((prevTags) => [...new Set([...prevTags, ...newRedactedWords])]);
     };
 
     const handleUpdateText = (index, newValue) => {
         const updatedStrings = [...redactedWords];
-        updatedStrings[index] = newValue;
+        updatedStrings[index] = newValue; // Update the specific redacted word
         setRedactedWords(updatedStrings);
+    
+        // Synchronize the tags with the updated redacted words
+        setTags((prevTags) => {
+            const updatedTags = new Set([...prevTags]);
+            updatedTags.delete(redactedWords[index]); // Remove the old value
+            updatedTags.add(newValue); // Add the new value
+            return [...updatedTags];
+        });
     };
 
     const handleRemoveText = (index) => {
+        const removedWord = redactedWords[index];
         const updatedStrings = redactedWords.filter((_, i) => i !== index);
-        setRedactedWords(redactedWords);
+        setRedactedWords(updatedStrings);
+    
+        // Remove the corresponding word from tags
+        setTags((prevTags) => prevTags.filter((tag) => tag !== removedWord));
     };
-
-    const handleUpdateRedaction = async () => {
-        if (!selectedFile) {
-            toast.error("No file selected for redaction.");
-            return;
-        }
-
-        if (redactedStrings.length === 0) {
-            toast.error("No redacted strings to update.");
-            return;
-        }
-
-        toast.info("Updating redaction, please wait...");
-        setLoading(true);
-
-        try {
-            // Send updated redactedStrings to backend to process the new redaction
-            const response = await fetch(
-                "https://legalai-backend-1.onrender.com/api/update_redaction",
-                {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        unique_identifier: uniqueIdentifier,
-                        file_path: selectedFile.path,
-                        redacted_texts: redactedStrings,
-                        redaction_type: "strikethrough", // or "blackout" based on your requirement
-                    }),
-                }
-            );
-
-            if (!response.ok) {
-                throw new Error("Failed to update redaction.");
-            }
-
-            const data = await response.json();
-            toast.success("Redaction updated successfully.");
-
-            // Update the file in the files state
-            setFiles((prevFiles) =>
-                prevFiles.map((file) =>
-                    file.name === selectedFile.name
-                        ? {
-                              ...file,
-                              path: `/var/data/users/${uniqueIdentifier}/redact_output/${data.redactedFileName}`,
-                              redactedTexts: redactedStrings,
-                          }
-                        : file
-                )
-            );
-
-            // Update the selected file's path
-            setSelectedFile((prevFile) => ({
-                ...prevFile,
-                path: `/var/data/users/${uniqueIdentifier}/redact_output/${data.redactedFileName}`,
-            }));
-
-            // Update the blob URL with the new file
-            if (pdfBlobUrl) {
-                URL.revokeObjectURL(pdfBlobUrl);
-            }
-            const newBlobUrl = URL.createObjectURL(data.newBlob); // Assuming backend returns the new blob
-            setPdfBlobUrl(newBlobUrl);
-
-            closeEditModal();
-        } catch (error) {
-            console.error("Error updating redaction:", error);
-            toast.error("An error occurred while updating redaction.");
-        } finally {
-            setLoading(false);
-        }
-    };
+    
+    
 
     const handleUpload = async () => {
         if (files.length === 0) {
@@ -218,160 +180,301 @@ const RedactTool = () => {
         setTags((prevTags) => prevTags.filter((tag) => tag !== tagToRemove));
     };
 
-    // const handleRedact = async () => {
-    //     if (!uniqueIdentifier) {
-    //         toast.error("Unique identifier not found. Please log in again.");
-    //         return;
-    //     }
-
-    //     if (files.length === 0) {
-    //         toast.error("No files available for redaction. Please upload files first.");
-    //         return;
-    //     }
-
-    //     // Construct file paths based on the unique identifier and file names
-    //     const filePaths = files.map(
-    //         (file) => `/var/data/users/${uniqueIdentifier}/${file.name}`
-    //     );
-
-    //     toast.info("Redacting documents, please wait...");
-    //     setLoading(true); // Start loading
-
-    //     try {
-    //         const response = await fetch("https://legalai-backend-1.onrender.com/api/redact_pdfs", {
-    //             method: "POST",
-    //             headers: { "Content-Type": "application/json" },
-    //             body: JSON.stringify({
-    //                 unique_identifier: uniqueIdentifier,
-    //                 file_paths: filePaths, // Use the constructed file paths
-    //                 tags,
-    //                 redaction_type: "strikethrough",
-    //             }),
-    //         });
-
-    //         if (!response.ok) {
-    //             throw new Error("Failed to redact documents.");
-    //         }
-
-    //         const data = await response.json();
-    //         console.log("Redaction response:", data);
-    //         toast.success("Redaction completed successfully.");
-    //         setRedactedFiles(
-    //             data.files.map((file) => ({
-    //                 name: file.redacted,
-    //                 path: `/var/data/users/${uniqueIdentifier}/redact_output/${file.redacted}`,
-    //             }))
-    //         ); // Update file list with redacted files
-    //         setRedactedWords(data.keywords); // Update redacted words list
-    //         setStep(3); // Move to Step 3
-            
-    //     } catch (error) {
-    //         console.error("Error redacting documents:", error);
-    //         toast.error("An error occurred during redaction.");
-    //     } finally {
-    //         setLoading(false); // Stop loading
-    //     }
-    // };
-
+    
 
     const handleRedact = async () => {
         if (!uniqueIdentifier) {
             toast.error("Unique identifier not found. Please log in again.");
             return;
         }
-    
+
         if (files.length === 0) {
             toast.error("No files available for redaction. Please upload files first.");
             return;
         }
-    
+
+        // Construct file paths based on the unique identifier and file names
         const filePaths = files.map(
             (file) => `/var/data/users/${uniqueIdentifier}/${file.name}`
         );
-    
+
         toast.info("Redacting documents, please wait...");
-        setLoading(true);
-    
+        setLoading(true); // Start loading
+
         try {
-            const response = await fetch("https://legalai-backend-1.onrender.com/api/redact_pdfs", {
+            const response = await fetch("https://legalai-backend-1.onrender.com/api/redact_pdfs_new", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     unique_identifier: uniqueIdentifier,
-                    file_paths: filePaths,
-                    tags,
+                    file_paths: filePaths, // Use the constructed file paths
+                    tags: tags,
                     redaction_type: "strikethrough",
+                    keywords: redactedWords, // Pass the tags as keywords
                 }),
             });
-    
+
             if (!response.ok) {
                 throw new Error("Failed to redact documents.");
             }
-    
+
             const data = await response.json();
             console.log("Redaction response:", data);
             toast.success("Redaction completed successfully.");
-    
-            setRedactedWords(data.keywords); // Update redacted words list
-    
-            // Force the iframe to reload
-            setPdfBlobUrl(`${pdfBlobUrl}?t=${new Date().getTime()}`); // Append timestamp
-    
+            setRedactedFiles(
+                data.files.map((file) => ({
+                    name: file.redacted,
+                    path: `/var/data/users/${uniqueIdentifier}/redact_output/${file.redacted}`,
+                }))
+            ); // Update file list with redacted files
+            setRedactedWords(data.keywords);
+            setKeywordsWithCoordinates(data.keyword_instances);
             setStep(3); // Move to Step 3
+            
         } catch (error) {
             console.error("Error redacting documents:", error);
             toast.error("An error occurred during redaction.");
         } finally {
-            setLoading(false);
+            setLoading(false); // Stop loading
         }
     };
+
+
+    // const handleRedact = async () => {
+    //     if (!uniqueIdentifier) {
+    //         toast.error("Unique identifier not found. Please log in again.");
+    //         return;
+    //     }
+    
+    //     if (files.length === 0) {
+    //         toast.error("No files available for redaction. Please upload files first.");
+    //         return;
+    //     }
+    
+    //     const filePaths = files.map(
+    //         (file) => `/var/data/users/${uniqueIdentifier}/${file.name}`
+    //     );
+    
+    //     toast.info("Redacting documents, please wait...");
+    //     setLoading(true);
+    
+    //     try {
+    //         const response = await fetch("https://legalai-backend-1.onrender.com/api/redact_pdfs", {
+    //             method: "POST",
+    //             headers: { "Content-Type": "application/json" },
+    //             body: JSON.stringify({
+    //                 unique_identifier: uniqueIdentifier,
+    //                 file_paths: filePaths,
+    //                 tags,
+    //                 redaction_type: "strikethrough",
+    //             }),
+    //         });
+    
+    //         if (!response.ok) {
+    //             throw new Error("Failed to redact documents.");
+    //         }
+    
+    //         const data = await response.json();
+    //         console.log("Redaction response:", data);
+    //         toast.success("Redaction completed successfully.");
+    
+    //         setRedactedWords(data.keywords); // Update redacted words list
+    
+    //         // Force the iframe to reload
+    //         setPdfBlobUrl(`${pdfBlobUrl}?t=${new Date().getTime()}`); // Append timestamp
+    
+    //         setStep(3); // Move to Step 3
+    //     } catch (error) {
+    //         console.error("Error redacting documents:", error);
+    //         toast.error("An error occurred during redaction.");
+    //     } finally {
+    //         setLoading(false);
+    //     }
+    // };
 
     
+    // const handleRedact = async () => {
+    //     if (!uniqueIdentifier) {
+    //         toast.error("Unique identifier not found. Please log in again.");
+    //         return;
+    //     }
+    
+    //     if (files.length === 0) {
+    //         toast.error("No files available for redaction. Please upload files first.");
+    //         return;
+    //     }
+    
+    //     const filePaths = files.map(
+    //         (file) => `/var/data/users/${uniqueIdentifier}/${file.name}`
+    //     );
+    
+    //     toast.info("Redacting documents, please wait...");
+    //     setLoading(true);
+    
+    //     try {
+    //         const response = await fetch("https://legalai-backend-1.onrender.com/api/redact_pdfs_new", {
+    //             method: "POST",
+    //             headers: { "Content-Type": "application/json" },
+    //             body: JSON.stringify({
+    //                 unique_identifier: uniqueIdentifier,
+    //                 file_paths: filePaths,
+    //                 tags: tags,
+    //                 redaction_type: "strikethrough",
+    //                 keywords: redactedWords,
+    //             }),
+    //         });
+    
+    //         if (!response.ok) {
+    //             throw new Error("Failed to redact documents.");
+    //         }
+    
+    //         const data = await response.json();
+    //         console.log("Redaction response:", data);
+    
+    //         toast.success("Redaction completed successfully.");
+    //         setRedactedFiles(
+    //             data.files.map((file) => ({
+    //                 name: file.redacted,
+    //                 path: `/var/data/users/${uniqueIdentifier}/redact_output/${file.redacted}`,
+    //             }))
+    //         );
+    //         setRedactedWords(data.keywords);
+    //         setKeywordsWithCoordinates(data.keyword_instances);
+    
+    //         // Fetch the updated PDF file
+    //         const updatedFileResponse = await fetch(
+    //             `https://legalai-backend-1.onrender.com/api/get_file`,
+    //             {
+    //                 method: "POST",
+    //                 headers: {
+    //                     "Content-Type": "application/json",
+    //                 },
+    //                 body: JSON.stringify({
+    //                     file_path: `/var/data/users/${uniqueIdentifier}/redact_output/${selectedFile.name}`,
+    //                 }),
+    //             }
+    //         );
+    
+    //         if (!updatedFileResponse.ok) {
+    //             throw new Error("Failed to fetch the updated PDF.");
+    //         }
+    
+    //         const updatedBlob = await updatedFileResponse.blob();
+    //         const updatedBlobUrl = URL.createObjectURL(updatedBlob);
+    
+    //         // Revoke the old blob URL and set the new one
+    //         if (pdfBlobUrl) {
+    //             URL.revokeObjectURL(pdfBlobUrl);
+    //         }
+    //         setPdfBlobUrl(updatedBlobUrl);
+    
+    //         setStep(3);
+    //     } catch (error) {
+    //         console.error("Error redacting documents:", error);
+    //         toast.error("An error occurred during redaction.");
+    //     } finally {
+    //         setLoading(false);
+    //     }
+    // };
+    
+
     console.log("files: ", files);
     console.log("redacted files: ", redactedFiles);
+    
+    
+    // const handleDownloadPDF = async () => {
+    //     if (redactedFiles.length === 0) {
+    //         toast.error("No redacted files available for download.");
+    //         return;
+    //     }
+
+    //     const file = redactedFiles[0];
+    //     console.log("file path: ", file.path);
+
+    //     try {
+    //         const response = await fetch(
+    //             "https://legalai-backend-1.onrender.com/api/get_file",
+    //             {
+    //                 method: "POST",
+    //                 headers: {
+    //                     "Content-Type": "application/json",
+    //                 },
+    //                 body: JSON.stringify({ file_path: file.path }),
+    //             }
+    //         );
+
+    //         if (!response.ok) {
+    //             throw new Error("Failed to fetch the file.");
+    //         }
+
+    //         const blob = await response.blob();
+    //         const url = window.URL.createObjectURL(blob);
+
+    //         // Create a temporary anchor element to trigger download
+    //         const a = document.createElement("a");
+    //         a.href = url;
+    //         a.download = file.name;
+    //         document.body.appendChild(a);
+    //         a.click();
+    //         a.remove();
+
+    //         window.URL.revokeObjectURL(url); // Clean up the URL object
+    //         toast.success(`Downloaded: ${file.name}`);
+    //     } catch (error) {
+    //         console.error("Error downloading file:", error);
+    //         toast.error("An error occurred while downloading the file.");
+    //     }
+    // };
+
     const handleDownloadPDF = async () => {
-        if (redactedFiles.length === 0) {
-            toast.error("No redacted files available for download.");
-            return;
-        }
-
-        const file = redactedFiles[0];
-        console.log("file path: ", file.path);
-
         try {
-            const response = await fetch(
-                "https://legalai-backend-1.onrender.com/api/get_file",
-                {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({ file_path: file.path }),
-                }
-            );
-
-            if (!response.ok) {
-                throw new Error("Failed to fetch the file.");
+            // Step 1: Request blackout redaction
+            const blackoutResponse = await fetch("https://legalai-backend-1.onrender.com/api/download_redacted_pdf", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    file_path: `/var/data/users/${uniqueIdentifier}/${files[0].name}`,
+                    keywords_instances: keywordsWithCoordinates,
+                    unique_identifier: uniqueIdentifier,
+                }),
+            });
+    
+            if (!blackoutResponse.ok) {
+                throw new Error("Failed to generate blackout redacted PDF");
             }
-
-            const blob = await response.blob();
+    
+            const blackoutData = await blackoutResponse.json();
+            const filePath = blackoutData.file_path;
+    
+            // Step 2: Fetch the blackout file
+            const fileResponse = await fetch("https://legalai-backend-1.onrender.com/api/get_file", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ file_path: filePath }),
+            });
+    
+            if (!fileResponse.ok) {
+                throw new Error("Failed to fetch blackout file");
+            }
+    
+            const blob = await fileResponse.blob();
             const url = window.URL.createObjectURL(blob);
-
-            // Create a temporary anchor element to trigger download
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = file.name;
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-
+    
+            // Trigger file download
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = `Redacted_${files[0].name}`;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+    
             window.URL.revokeObjectURL(url); // Clean up the URL object
-            toast.success(`Downloaded: ${file.name}`);
         } catch (error) {
-            console.error("Error downloading file:", error);
-            toast.error("An error occurred while downloading the file.");
+            console.error("Error downloading blackout file:", error);
+            alert("An error occurred while downloading the file.");
         }
     };
+    
 
     return (
         <div className="bg-gray-100 flex flex-col items-center min-h-screen w-screen">
@@ -722,94 +825,93 @@ const RedactTool = () => {
 
             {/* Edit Modal */}
             <Modal
-                isOpen={isEditModalOpen}
-                onRequestClose={closeEditModal}
-                className="w-11/12 h-11/12 bg-white rounded-lg shadow-xl p-6 mx-auto mt-12 flex flex-col md:flex-row overflow-hidden"
-                overlayClassName="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center"
+    isOpen={isEditModalOpen}
+    onRequestClose={closeEditModal}
+    className="w-11/12 min-h-[90vh] max-h-[90vh] bg-white rounded-lg shadow-xl p-4 mx-auto mt-8 mb-8 flex flex-col md:flex-row overflow-hidden"
+    overlayClassName="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center"
+>
+    <div className="flex-1 flex flex-col">
+        {/* Header with Back Button */}
+        <div className="flex justify-between items-center mb-4">
+            <button
+                className="text-gray-500 hover:text-gray-700"
+                onClick={closeEditModal}
             >
-                <div className="flex-1 flex flex-col">
-                    {/* Header with Back Button */}
-                    <div className="flex justify-between items-center mb-4">
-                        <button
-                            className="text-gray-500 hover:text-gray-700"
-                            onClick={closeEditModal}
-                        >
-                            ← Back
-                        </button>
-                        <h2 className="text-xl font-bold">Edit Redactions</h2>
-                        <div></div> {/* Placeholder for alignment */}
-                    </div>
+                ← Back
+            </button>
+            <h2 className="text-xl font-bold">Edit Redactions</h2>
+            <div></div> {/* Placeholder for alignment */}
+        </div>
 
-                    <div className="flex-1 flex flex-col md:flex-row">
-                        {/* PDF Preview */}
-                        <div className="w-full md:w-3/5 h-full border-r-2 overflow-y-scroll p-4 relative">
-                            <h3 className="text-lg font-semibold mb-4">Preview: {selectedFile?.name}</h3>
-                            {pdfBlobUrl ? (
-                                <iframe
-                                    src={pdfBlobUrl}
-                                    title={`Preview of ${selectedFile.name}`}
-                                    className="w-full h-full"
-                                    frameBorder="0"
+        <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
+            {/* PDF Preview */}
+            <div className="w-full md:w-3/5 h-full border-r-2 overflow-y-auto p-4">
+                <h3 className="text-lg font-semibold mb-4">Preview: {selectedFile?.name}</h3>
+                {pdfBlobUrl ? (
+                    <iframe
+                        src={pdfBlobUrl}
+                        title={`Preview of ${selectedFile.name}`}
+                        className="w-full h-full"
+                        frameBorder="0"
+                    />
+                ) : (
+                    <p className="text-gray-500">Loading PDF...</p>
+                )}
+            </div>
+
+            {/* Redacted Strings */}
+            <div className="w-full md:w-2/5 h-full flex flex-col p-4 overflow-y-auto">
+                <h3 className="text-lg font-semibold mb-4">Redacted Strings</h3>
+                <div className="flex-1 overflow-y-auto">
+                    {redactedWords.length > 0 ? (
+                        redactedWords.map((string, index) => (
+                            <div
+                                key={index}
+                                className="flex items-center justify-between bg-gray-100 p-2 rounded-lg mb-2"
+                            >
+                                <input
+                                    type="text"
+                                    value={string}
+                                    onChange={(e) => handleUpdateText(index, e.target.value)}
+                                    className="flex-1 p-2 border rounded-lg"
+                                    placeholder="Enter redacted text"
                                 />
-                            ) : (
-                                <p className="text-gray-500">Loading PDF...</p>
-                            )}
-                        </div>
-
-                        {/* Redacted Strings */}
-                        <div className="w-full md:w-2/5 h-full flex flex-col p-4">
-                            <h3 className="text-lg font-semibold mb-4">Redacted Strings</h3>
-                            <div className="flex-1 overflow-y-scroll">
-                                {redactedWords.length > 0 ? (
-                                    redactedWords.map((string, index) => (
-                                        <div
-                                            key={index}
-                                            className="flex items-center justify-between bg-gray-100 p-2 rounded-lg mb-2"
-                                        >
-                                            <input
-                                                type="text"
-                                                value={string}
-                                                onChange={(e) =>
-                                                    handleUpdateText(index, e.target.value)
-                                                }
-                                                className="flex-1 p-2 border rounded-lg"
-                                                placeholder="Enter redacted text"
-                                            />
-                                            <button
-                                                className="ml-2 text-red-500 hover:text-red-700"
-                                                onClick={() => handleRemoveText(index)}
-                                            >
-                                                ✕
-                                            </button>
-                                        </div>
-                                    ))
-                                ) : (
-                                    <p className="text-gray-500">No redacted strings available.</p>
-                                )}
+                                <button
+                                    className="ml-2 text-red-500 hover:text-red-700"
+                                    onClick={() => handleRemoveText(index)}
+                                >
+                                    ✕
+                                </button>
                             </div>
-                            <button
-                                className="mt-4 bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600 transition"
-                                onClick={handleAddText}
-                            >
-                                + Add New Text
-                            </button>
-                            <button
-                                className={`mt-4 bg-green-500 text-white py-2 rounded-lg hover:bg-green-600 transition ${
-                                    redactedWords.length === 0 ? "opacity-50 cursor-not-allowed" : ""
-                                }`}
-                                onClick={() => {
-                                    
-                                    setTags(redactedWords);
-                                    handleRedact();
-                                }}
-                                disabled={redactedWords.length === 0}
-                            >
-                                Update Redaction
-                            </button>
-                        </div>
-                    </div>
+                        ))
+                    ) : (
+                        <p className="text-gray-500">No redacted strings available.</p>
+                    )}
                 </div>
-            </Modal>
+                <button
+                    className="mt-4 bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600 transition"
+                    onClick={handleAddText}
+                >
+                    + Add New Text
+                </button>
+                <button
+                    className={`mt-4 bg-green-500 text-white py-2 rounded-lg hover:bg-green-600 transition ${
+                        redactedWords.length === 0 ? "opacity-50 cursor-not-allowed" : ""
+                    }`}
+                    onClick={() => {
+                        setTags(redactedWords);
+                        handleRedact();
+                    }}
+                    disabled={redactedWords.length === 0}
+                >
+                    Update Redaction
+                </button>
+            </div>
+        </div>
+    </div>
+</Modal>
+
+
         </div>
     );
 }
