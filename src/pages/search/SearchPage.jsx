@@ -60,28 +60,6 @@ const SearchPage = () => {
         fetchInitialData();
     }, []);
 
-    const handleFileUpload = (event) => {
-        const uploadedFiles = Array.from(event.target.files);
-        const updatedFiles = uploadedFiles.map(file => ({
-            name: file.name,
-            type: file.type,
-            data: btoa(String.fromCharCode(...new Uint8Array(file))) // Corrected base64 encoding
-        }));
-        setFiles(prevFiles => [...prevFiles, ...updatedFiles]);
-
-        // Save to session storage
-        sessionStorage.setItem("caseFormData", JSON.stringify({ document: [...files, ...updatedFiles] }));
-    };
-
-    const handleOpenFile = (file) => {
-        const byteCharacters = atob(file.data);
-        const byteNumbers = new Array(byteCharacters.length).fill(null).map((_, i) => byteCharacters.charCodeAt(i));
-        const byteArray = new Uint8Array(byteNumbers);
-        const blob = new Blob([byteArray], { type: file.type });
-        const blobUrl = URL.createObjectURL(blob);
-        window.open(blobUrl, '_blank');
-    };
-
     const openCaseOverlay = (content) => {
         setIsDocumentCollapsed(false);
         const textContent = typeof content === 'string' ? content : content?.content || JSON.stringify(content);
@@ -145,7 +123,7 @@ const SearchPage = () => {
     return (
         <div className="flex flex-col h-screen w-screen">
             <ToastContainer />
-            
+
             {/* Top Navigation Bar for Mobile */}
             <div className="md:hidden bg-[#EFF3F6] p-4 flex items-center justify-between">
                 <div className="flex items-center">
@@ -161,17 +139,16 @@ const SearchPage = () => {
                 </button>
             </div>
 
-            <div className="flex flex-1  overflow-hidden">
+            <div className="flex flex-1 overflow-hidden relative">
                 
-                {/* Left Side */}
-            <div className={`${
-                    isDocumentCollapsed
-                        ? 'w-1/12'
-                        : isCaseOverlayOpen
-                            ? 'w-1/2'
-                            : 'w-1/4'
-                } bg-gray-100 p-4 overflow-y-auto`}>
-
+                {/* Sidebar for Desktop */}
+                <div className={`hidden md:block ${
+                        isDocumentCollapsed
+                            ? 'w-1/12'
+                            : isCaseOverlayOpen
+                                ? 'w-1/2'
+                                : 'w-1/4'
+                    } bg-gray-100 p-4 overflow-y-auto`}>
                     <div>
                         <SearchPanel
                             openCaseOverlay={openCaseOverlay}
@@ -181,23 +158,62 @@ const SearchPage = () => {
                             overlayContent={overlayContent}
                             setSelectedOption={setSelectedOption}
                         >
-                            </SearchPanel>
+                        </SearchPanel>
                     </div>
-            </div>
+                </div>
 
-                {/* Main Content */}
-                {/* <div className={`flex-1 h-full transition-all duration-300 p-4 flex flex-col justify-center items-center rounded-3xl overflow-hidden`}>
-                    {showChatWindow && (
-                        <ChatWindow 
-                            openCaseOverlay={openCaseOverlay} 
-                            setIsDocumentCollapsed={toggleDocumentCollapse}
-                            setActiveChat={setActiveChat} // Pass setter to ChatWindow
-                            activeChat={activeChat} // Pass activeChat to ChatWindow
-                        />
-                    )}
-                </div> */}
+                {/* Mobile Sidebar */}
+                <Transition show={isMobileSidebarOpen} as={React.Fragment}>
+                    <div className="fixed inset-0 z-40 flex">
+                        <Transition.Child
+                            as={React.Fragment}
+                            enter="transition-opacity ease-linear duration-300"
+                            enterFrom="opacity-0"
+                            enterTo="opacity-100"
+                            leave="transition-opacity ease-linear duration-300"
+                            leaveFrom="opacity-100"
+                            leaveTo="opacity-0"
+                        >
+                            <div className="fixed inset-0 bg-black bg-opacity-25" onClick={toggleMobileSidebar}></div>
+                        </Transition.Child>
 
-                <div className="flex-1 bg-white p-4">
+                        <Transition.Child
+                            as={React.Fragment}
+                            enter="transition ease-in-out duration-300 transform"
+                            enterFrom="-translate-x-full"
+                            enterTo="translate-x-0"
+                            leave="transition ease-in-out duration-300 transform"
+                            leaveFrom="translate-x-0"
+                            leaveTo="-translate-x-full"
+                        >
+                            <div className={`relative flex-1 flex flex-col bg-gray-100 p-4 overflow-y-auto`}>
+                                <div className="absolute top-0 right-0 -mr-12 pt-2">
+                                    <button
+                                        className="ml-1 flex items-center justify-center h-10 w-10 rounded-full focus:outline-none focus:bg-gray-600"
+                                        onClick={toggleMobileSidebar}
+                                    >
+                                        <XIcon className="h-6 w-6 text-white" />
+                                    </button>
+                                </div>
+                                <SearchPanel
+                                    openCaseOverlay={openCaseOverlay}
+                                    isCaseOverlayOpen={isCaseOverlayOpen}
+                                    setIsCaseOverlayOpen={setIsCaseOverlayOpen}
+                                    setSelectedSearchCases={setSelectedSearchCases}
+                                    overlayContent={overlayContent}
+                                    setSelectedOption={setSelectedOption}
+                                />
+                            </div>
+                        </Transition.Child>
+
+                        <div className="flex-shrink-0 w-14" aria-hidden="true">
+                            {/* Dummy element to force sidebar to shrink to fit close icon */}
+                        </div>
+                    </div>
+                </Transition>
+
+                {/* Main Content Area */}
+                <div className="flex-1 w-full bg-white p-4 flex flex-col">
                     <SearchChatWindow 
                         openCaseOverlay={openCaseOverlay} 
                         setIsDocumentCollapsed={toggleDocumentCollapse}
@@ -205,8 +221,7 @@ const SearchPage = () => {
                         activeChat={activeChat}
                         selectedSearchCases={selectedSearchCases}
                     />
-
-            </div>
+                </div>
 
             </div>
         </div>

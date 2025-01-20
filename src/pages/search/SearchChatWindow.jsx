@@ -1,4 +1,4 @@
-// ChatWindow.jsx
+// SearchChatWindow.jsx
 
 import React, { useState, useRef, useEffect } from 'react';
 import Message from '../../components/chat/Message';
@@ -10,57 +10,6 @@ import 'react-quill/dist/quill.snow.css';
 import DOMPurify from 'dompurify';
 
 const { GoogleGenerativeAI } = require("@google/generative-ai");
-
-
-// const prompt_template = `
-// You are an expert in Legal Assistance and your job is to respond to queries by the user. Your name is Banthry AI, and assume yourself as an Legal Assistant. Don't provide any disclaimer or anything. You are an expert in legal assistance that's it.
-
-// Refer to the Chat History if required. The format of your answer should be extremely professional and presentable.
-
-// **IMPORTANT NOTE**
-// 1. You should respond in simple text format. 
-// 2. You should use <li>, <b>, <br> tags for formatting instead of new line character and *, ** tags.
-// 3. You should always answer according to rules and regulations of India and should always include referencing to backup your statements.
-// 4. **MOST IMPORTANT**: You should include the following tags in your every response whenever you are referring to anything (so that the backend can process this and create reference badges).
-//         FORMAT: <code:code_name:section_number>
-//         there should be only one Section number. If you want multiple sections then add multiple <> tags.
-
-//         Example: In the Criminal Penal Code Section 17 <code:crpc:17> this means it is referring to section 17 of CrPC.
-//         Example acts/codes: <code:hma:17> this means section 17 of Hindu Marriage Act.
-//         <code:dva:23> this means section 23 of Domestic Violence Act.
-//         <code:ipc:241> this means section 241 of India Penal Code
-
-//         ** In case you want to refer to the whole Act, use section_number as 1.
-// 5. Use the acts from following list:
-//     ipc for Indian Penal Code
-//     crpc for Criminal Penal Code
-//     dva for Domestic Violence Act
-//     hma for Hindu Marriage Act
-//     ida for Indian Divorce Act
-//     sma for Special Marriage Act
-//     cpc: "Code of Civil Procedure",
-//     bns: "Bengal Nuisance Act",
-//     iea: "Indian Evidence Act",
-//     mva: "Motor Vehicles Act",
-//     nia: "Negotiable Instruments Act"
-//     public_worship_act: Kerala Hindu Places of Public Worship (Authorisation of Entry) Act
-//     indian_constitution: Indian Constitution. Give referencing as 
-
-//     ../ and so on
-
-// 6. When referring to a case you should refer as: <case_id:id>: Example: Cases like Navneet Arora vs Surender Kaur & Ors. <case_id:134312774> support the wife's right to reside in the matrimonial home
-//     **NOTE** The case id can be of format a number 134312774 or a code like [1981] Supp SCC 87 or [2021] 7 SCR 571. you should give this as <case_id:[2021] 7 SCR 571>.
-
-// 7. If information is asked for all cases, then create different paragraphs with proper line breaks, highlighting, numbering and bullet points. It should be clearly visible and distinguishable.
-
-// Below is the user query:
-// {user_query}
-
-// Below is the case data:
-// {case_data}
-
-// Now answer the user query & ensure accurate referencing is done in every response. Read all instructions again:
-// `;
 
 const prompt_template = `
 You are an expert in Legal Assistance and your job is to respond to queries by the user. Your name is Banthry AI, and assume yourself as an Legal Assistant. Don't provide any disclaimer or anything. You are an expert in legal assistance that's it.
@@ -118,7 +67,7 @@ Now answer the user query & ensure accurate referencing is done in every respons
 
 
 const client = async (prompt, history) => {
-    const apiKey = "AIzaSyDzl9Xc6JWi0maEyGXiSy-K22-4GBw5w2c"; // Replace with your actual API key
+    const apiKey = "YOUR_API_KEY_HERE"; // Replace with your actual API key
     if (!apiKey) {
         throw new Error("Gemini API key is not set.");
     }
@@ -164,92 +113,7 @@ const client = async (prompt, history) => {
 };
 
 
-// const client = async (prompt, history, files = []) => {
-//     const apiKey = "AIzaSyDzl9Xc6JWi0maEyGXiSy-K22-4GBw5w2c"; // Replace with your actual API key
-//     if (!apiKey) {
-//       throw new Error("Gemini API key is not set.");
-//     }
-  
-//     const genAI = new GoogleGenerativeAI(apiKey);
-  
-//     const model = genAI.getGenerativeModel({
-//       model: "gemini-1.5-flash-8b",
-//     });
-  
-//     const generationConfig = {
-//       temperature: 1,
-//       topP: 0.95,
-//       topK: 40,
-//       maxOutputTokens: 8192,
-//       responseMimeType: "text/plain",
-//     };
-  
-//     const arrayBufferToBase64 = (buffer) => {
-//       let binary = '';
-//       const bytes = new Uint8Array(buffer);
-//       const len = bytes.byteLength;
-//       for (let i = 0; i < len; i++) {
-//         binary += String.fromCharCode(bytes[i]);
-//       }
-//       return window.btoa(binary);
-//     };
-  
-//     const filePromises = files.map(async (file) => {
-//       const response = await fetch(file.url, { cache: "no-cache" });
-//       if (!response.ok) {
-//         throw new Error(`Failed to fetch file: ${file.name}`);
-//       }
-//       const arrayBuffer = await response.arrayBuffer();
-//       const base64Data = arrayBufferToBase64(arrayBuffer);
-//       console.log(`File ${file.name} Base64:`, base64Data.slice(0, 100)); // Log first 100 characters of Base64 for debugging
-//       return {
-//         mimeType: file.mimeType,
-//         base64: base64Data,
-//         name: file.name,
-//       };
-//     });
-  
-//     const inlineFiles = await Promise.all(filePromises);
-  
-//     console.log("Inline files prepared for Gemini:", inlineFiles);
-  
-//     const chatSession = model.startChat({
-//       generationConfig,
-//       history: [
-//         ...history
-//           .filter((msg) => msg.text.trim() !== "")
-//           .map((msg) => ({
-//             role: msg.sender === "user" ? "user" : "model",
-//             parts: msg.text
-//               .split("\n")
-//               .filter((part) => part.trim() !== "")
-//               .map((part) => ({ text: part })),
-//           })),
-//         {
-//           role: "user",
-//           parts: [
-//             ...inlineFiles.map((file) => ({
-//               inlineData: {
-//                 data: file.base64,
-//                 mimeType: file.mimeType,
-//               },
-//             })),
-//             { text: prompt },
-//           ],
-//         },
-//       ],
-//     });
-  
-//     const result = await chatSession.sendMessage(prompt);
-  
-//     console.log("Response from Gemini client:", result);
-//     return result.response.candidates[0].content.parts[0].text;
-//   };
-  
-
-
-
-const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, activeChat, selectedSearchCases }) => {
+const SearchChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, activeChat, selectedSearchCases }) => {
     const initialHistory = [
         { text: "Hello! I am Banthry AI, <br> Here to assist your legal queries. Please enter query to search cases.", sender: 'model' }
     ];
@@ -303,13 +167,6 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
         }
     }, [activeChat]);
 
-    // Helper function to strip HTML tags and get plain text
-    const stripHtml = (html) => {
-        const tmp = document.createElement("DIV");
-        tmp.innerHTML = html;
-        return tmp.textContent || tmp.innerText || "";
-    };
-
     // Helper function to encode HTML entities
     const encodeHtmlEntities = (text) => {
         const div = document.createElement('div');
@@ -317,106 +174,7 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
         return div.innerHTML;
     };
 
-    // Helper function to decode HTML entities
-    const decodeHtmlEntities = (text) => {
-        const parser = new DOMParser();
-        const decodedString = parser.parseFromString(text, 'text/html').documentElement.textContent;
-        return decodedString;
-    };
 
-    // Helper function to extract references from HTML content
-    const extractReferences = (html) => {
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(html, 'text/html');
-        const spans = doc.querySelectorAll('span.reference-badge');
-        const references = [];
-
-        spans.forEach(span => {
-            if (span.getAttribute('data-ref-case')) {
-                references.push({
-                    type: 'case',
-                    id: span.getAttribute('data-ref-case'),
-                    text: span.innerText
-                });
-            }
-            if (span.getAttribute('data-ref-code')) {
-                references.push({
-                    type: 'code',
-                    act: span.getAttribute('data-ref-code'),
-                    section: span.getAttribute('data-ref-section'),
-                    text: span.innerText
-                });
-            }
-        });
-
-        return references;
-    };
-
-    // Helper function to replace references with placeholders
-    const replaceReferencesWithPlaceholders = async (text, references) => {
-        let placeholderMap = {};
-        let modifiedText = text;
-
-        for (const [index, ref] of references.entries()) {
-            let uniqueId = ref.id || `${ref.act}-${ref.section}`;
-            let placeholderText = ref.text;
-
-            if (ref.type === 'case') {
-                const titleResult = await fetchCaseTitle(ref.id);
-                placeholderText = titleResult ? titleResult : "Unknown Title";
-            }
-
-            // Encode placeholder text to handle special characters
-            const encodedPlaceholderText = encodeHtmlEntities(placeholderText);
-
-            // Create a unique placeholder (using index to ensure uniqueness)
-            const placeholder = `[[ref-${index}-${encodedPlaceholderText}]]`;
-
-            // Encode the original reference text for regex
-            const encodedRefText = encodeHtmlEntities(ref.text);
-
-            // Escape special characters for regex
-            const escapedRefText = encodedRefText.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
-
-            // Replace all instances of the reference with the placeholder
-            const regex = new RegExp(`<span[^>]*>${escapedRefText}</span>`, 'g');
-            modifiedText = modifiedText.replace(regex, placeholder);
-
-            // Map the placeholder to the reference
-            placeholderMap[placeholder] = ref;
-        }
-        return { modifiedText, placeholderMap };
-    };
-
-    // Helper function to replace placeholders with references
-    // const replacePlaceholdersWithReferences = (text, placeholderMap) => {
-    //     let modifiedText = text;
-    //     console.log("Text with placeholders:", modifiedText);  // Confirm placeholders in text
-    //     console.log("Placeholder Map:", placeholderMap);        // Confirm placeholders in map
-
-    //     Object.entries(placeholderMap).forEach(([placeholder, ref]) => {
-    //         // Encode any special characters in ref.text
-    //         const encodedRefText = encodeHtmlEntities(ref.text);
-
-    //         const replacement = ref?.type === 'case'
-    //             ? `<span data-ref-case="${ref.id}" class="reference-badge" style="cursor:pointer;color:blue;">${encodedRefText}</span>`
-    //             : `<span data-ref-code="${ref.act}" data-ref-section="${ref.section}" class="reference-badge" style="cursor:pointer;color:blue;">${encodedRefText}</span>`;
-
-    //         // Escape the placeholder text for use in a regular expression
-    //         const escapedPlaceholder = placeholder.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
-
-    //         // Create a new regular expression with the global flag to match all occurrences
-    //         const regex = new RegExp(escapedPlaceholder, 'g');
-
-    //         // Replace all instances of the placeholder with the replacement text
-    //         modifiedText = modifiedText.replace(regex, replacement);
-    //     });
-
-    //     console.log("After replacement:", modifiedText);
-    //     return modifiedText;
-    // };
-
-    // Helper function to replace placeholders with references
 const replacePlaceholdersWithReferences = (text, placeholderMap) => {
     let modifiedText = text;
     console.log("Text with placeholders:", modifiedText);  // Confirm placeholders in text
@@ -455,26 +213,6 @@ const replacePlaceholdersWithReferences = (text, placeholderMap) => {
 };
 
 
-    // Enter edit mode by extracting plain text and references
-    const enterEditMode = async () => {
-        const latestBotMessage = messages.slice().reverse().find((msg) => msg.sender === 'model');
-        if (latestBotMessage) {
-            const plainText = stripHtml(latestBotMessage.text);
-            const references = extractReferences(latestBotMessage.text);
-            const { modifiedText, placeholderMap } = await replaceReferencesWithPlaceholders(latestBotMessage.text, references);
-            setEditContent(modifiedText);
-            setEditReferences(references);
-            setEditPlaceholders(placeholderMap);
-            setEditMode(true);
-            setIsDocumentCollapsed(true);
-
-            if (window.innerWidth < 768) { // Tailwind's md breakpoint is 768px
-                setIsEditModalOpen(true);
-            }
-        }
-    };
-
-    // Save edited message by reinserting references
     const saveEdit = () => {
         const updatedTextWithPlaceholders = editContent;
         const updatedText = replacePlaceholdersWithReferences(updatedTextWithPlaceholders, editPlaceholders);
@@ -516,27 +254,6 @@ const replacePlaceholdersWithReferences = (text, placeholderMap) => {
         setInputMessage(question); // Set the input message to the selected question
     };
     
-    
-    
-    
-    
-
-    const fetchCaseText = async (caseId, highlightIndexes) => {
-        try {
-            const response = await axios.get(`https://legalai-backend-1.onrender.com/fetch-case-text/${caseId}`);
-            const caseText = response.data;
-
-            // Split the text into paragraphs and add highlighting for specific indexes
-            const paragraphs = caseText.paragraphs.map((para, index) =>
-                highlightIndexes.includes(index) ? `<span style="background-color: #f9f9128a;">${para}</span>` : para
-            );
-
-            return paragraphs.join('\n\n');
-        } catch (error) {
-            console.error("Error fetching case text:", error);
-            return `Could not retrieve case text for ${caseId}.`;
-        }
-    };
 
     const fetchCodeText = async (act, section) => {
         try {
@@ -547,38 +264,6 @@ const replacePlaceholdersWithReferences = (text, placeholderMap) => {
             return `Could not retrieve text for ${act}, Section ${section}.`;
         }
     };
-
-    const fetchCaseTitle = async(caseId) => {
-        try {
-            const response = await axios.get(`https://legalai-backend-1.onrender.com/fetch-case-title/${caseId}`);
-            const data = response.data;
-    
-            if (data.error) {
-                console.error(data.error);
-                return null;
-            }
-    
-            const title = data.title || "No title available";
-            
-            return title;
-        } catch (error) {
-            console.error("Error fetching case data:", error);
-            return null;
-        }
-    }
-
-    // const replaceTagsWithLinks = (opinionText, caseRef) => {
-    //     const caseIds = Object.keys(caseRef);
-        
-    //     return opinionText
-    //         .replace(/<case_id:(\w+)>/g, (match, caseId) => {
-    //             const caseIndex = caseIds.indexOf(caseId) !== -1 ? caseIds.indexOf(caseId) + 1 : '?';
-    //             return `<span data-ref-case="${caseId}" class="reference-badge" style="cursor:pointer;color:blue;">Case ${caseIndex}</span>`;
-    //         })
-    //         .replace(/<code:(\w+):([\w()\s]+)>/g, (match, act, section) => { // Allow spaces and parentheses
-    //             return `<span data-ref-code="${act}" data-ref-section="${section}" class="reference-badge" style="cursor:pointer;color:blue;">${act} Section: ${section}</span>`;
-    //         });
-    // };
 
 
     const replaceTagsWithLinks = (opinionText, caseRef) => {
@@ -661,7 +346,7 @@ const replacePlaceholdersWithReferences = (text, placeholderMap) => {
             
             const prompt = prompt_template
                 .replace('{user_query}', inputMessage)
-                .replace('case_data', JSON.stringify(selectedSearchCases));
+                .replace('{case_data}', JSON.stringify(selectedSearchCases));
             
             const savedFiles = JSON.parse(localStorage.getItem("savedSearchFiles")) || [];
             console.log(savedFiles);
@@ -680,7 +365,7 @@ const replacePlaceholdersWithReferences = (text, placeholderMap) => {
             
             console.log("Files being sent to Gemini client:", filesForGemini);
             
-            const aiResponse = await client(prompt, filteredHistory, filesForGemini);
+            const aiResponse = await client(prompt, filteredHistory);
             
             console.log("Gemini response:", aiResponse);
             
@@ -757,7 +442,7 @@ const replacePlaceholdersWithReferences = (text, placeholderMap) => {
 
 
             {/* Main Chat Area */}
-            <div className="flex-1 flex overflow-hidden">
+            <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
                 {/* Message Area */}
                 <div className={`p-4 flex-1 overflow-y-auto transition-all duration-300`}>
                     <div className="flex flex-col space-y-4">
@@ -788,7 +473,7 @@ const replacePlaceholdersWithReferences = (text, placeholderMap) => {
 
                 {/* Edit Mode Overlay for Desktop */}
                 {!isEditModalOpen && editMode && (
-                    <div className="flex flex-col w-1/2 bg-white p-4 shadow-lg transition-all duration-300 overflow-y-auto">
+                    <div className="hidden md:flex flex-col w-1/2 bg-white p-4 shadow-lg transition-all duration-300 overflow-y-auto">
                         <div className="flex justify-between items-center mb-4">
                             <h3 className="text-lg font-bold">Edit Message</h3>
                             <button
@@ -886,60 +571,121 @@ const replacePlaceholdersWithReferences = (text, placeholderMap) => {
             </div>
 
             {/* Chat Input Area */}
-            <div className="flex items-center px-4 py-2 space-x-3 bg-gray-100">
-            
+            <div className="flex items-center px-3 py-2 bg-gray-100 rounded-lg shadow-md w-full overflow-x-auto space-x-2">
+    {/* Dropdown Button */}
+    <div className="flex-shrink-0">
+        <button
+            className="bg-gray-700 rounded-full flex items-center justify-center text-white hover:bg-blue-600 transition duration-200 p-2"
+            onClick={() => setShowDropdown((prev) => !prev)}
+        >
+            <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-6 w-6"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth="2"
+            >
+                <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M12 20.25c4.556 0 8.25-3.694 8.25-8.25s-3.694-8.25-8.25-8.25-8.25 3.694-8.25 8.25a8.193 8.193 0 002.248 5.673c-.093.463-.25 1.17-.517 1.908.811-.11 1.811-.33 2.453-.602a8.23 8.23 0 005.816 2.271z"
+                />
+                <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M10.25 8.5a1.75 1.75 0 113.5 0c0 .871-.71 1.576-1.464 2.23-.616.544-.786.846-.786 1.27m.002 1.75h.007"
+                />
+            </svg>
+        </button>
+        {showDropdown && (
+            <ul className="absolute bottom-full mb-2 bg-white shadow-lg rounded-lg py-2 w-48 text-sm text-gray-700">
+                <li
+                    className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                    onClick={() => handleQuestionSelect("What are the case details?")}
+                >
+                    Case Details
+                </li>
+                <li
+                    className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                    onClick={() => handleQuestionSelect("What is the case summary?")}
+                >
+                    Case Summary
+                </li>
+                <li
+                    className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                    onClick={() => handleQuestionSelect("What is the judgement?")}
+                >
+                    Judgement
+                </li>
+                <li
+                    className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                    onClick={() => handleQuestionSelect("What are the legal precedents for this case?")}
+                >
+                    Legal Precedents
+                </li>
+                <li
+                    className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                    onClick={() => handleQuestionSelect("What sections are referenced in this case?")}
+                >
+                    Section References
+                </li>
+                <li
+                    className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                    onClick={() => handleQuestionSelect("Can you provide a detailed case analysis?")}
+                >
+                    Case Analysis
+                </li>
+            </ul>
+        )}
+    </div>
 
-            <div className="relative">
-    <button
-        className="bg-gray-700 rounded-full flex items-center justify-center text-white hover:bg-blue-600 transition duration-200 p-2"
-        onClick={() => setShowDropdown((prev) => !prev)}
+    {/* Input Field */}
+    <form
+        onSubmit={sendMessage}
+        className="flex items-center bg-white px-3 py-2 rounded-full shadow-inner flex-grow space-x-2"
     >
-        {/* Icon: Chat bubble with question mark */}
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 20.25c4.556 0 8.25-3.694 8.25-8.25s-3.694-8.25-8.25-8.25-8.25 3.694-8.25 8.25a8.193 8.193 0 002.248 5.673c-.093.463-.25 1.17-.517 1.908.811-.11 1.811-.33 2.453-.602a8.23 8.23 0 005.816 2.271z" />
-            <path strokeLinecap="round" strokeLinejoin="round" d="M10.25 8.5a1.75 1.75 0 113.5 0c0 .871-.71 1.576-1.464 2.23-.616.544-.786.846-.786 1.27m.002 1.75h.007" />
+        <span className="text-gray-500 text-sm whitespace-nowrap">0 Files</span>
+        <input
+            type="text"
+            value={inputMessage}
+            onChange={(e) => setInputMessage(e.target.value)}
+            placeholder="Type your message here..."
+            className="flex-1 bg-transparent outline-none text-gray-700 placeholder-gray-400"
+        />
+        <button
+            type="submit"
+            className="bg-gray-700 rounded-full flex items-center justify-center text-white hover:bg-blue-600 transition duration-200 p-2 flex-shrink-0"
+        >
+            <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-5 w-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth="2"
+            >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+        </button>
+    </form>
+
+    {/* Save Chat Button */}
+    <button
+        className="flex items-center justify-center px-3 py-2 rounded-full bg-gray-700 text-white hover:bg-blue-600 transition duration-200 flex-shrink-0"
+        onClick={saveChat}
+    >
+        <svg
+            className="w-5 h-5 mr-2"
+            fill="currentColor"
+            viewBox="0 0 32 32"
+            xmlns="http://www.w3.org/2000/svg"
+        >
+            <title>asterisk</title>
+            <path d="M28.5 22.35l-10.999-6.35 10.999-6.351c0.231-0.131 0.385-0.375 0.385-0.655 0-0.414-0.336-0.75-0.75-0.75-0.142 0-0.275 0.040-0.388 0.108l0.003-0.002-11 6.35v-12.701c0-0.414-0.336-0.75-0.75-0.75s-0.75 0.336-0.75 0.75v0 12.7l-10.999-6.35c-0.11-0.067-0.243-0.106-0.385-0.106-0.414 0-0.75 0.336-0.75 0.75 0 0.28 0.154 0.524 0.381 0.653l0.004 0.002 10.999 6.351-10.999 6.35c-0.226 0.132-0.375 0.374-0.375 0.65 0 0.415 0.336 0.751 0.751 0.751 0 0 0 0 0.001 0h-0c0.138-0.001 0.266-0.037 0.378-0.102l-0.004 0.002 10.999-6.351v12.7c0 0.414 0.336 0.75 0.75 0.75s0.75-0.336 0.75-0.75v0-12.701l11 6.351c0.107 0.063 0.237 0.1 0.374 0.1 0.277 0 0.518-0.149 0.649-0.371l0.002-0.004c0.063-0.108 0.1-0.237 0.1-0.375 0-0.277-0.15-0.518-0.372-0.648l-0.004-0.002z" />
         </svg>
+        Save Chat
     </button>
-    {showDropdown && (
-        <ul className="absolute bottom-full mb-2 bg-white shadow-lg rounded-lg py-2 w-48 text-sm text-gray-700">
-            <li 
-                className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
-                onClick={() => handleQuestionSelect("What are the case details?")}
-            >
-                Case Details
-            </li>
-            <li 
-                className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
-                onClick={() => handleQuestionSelect("What is the case summary?")}
-            >
-                Case Summary
-            </li>
-            <li 
-                className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
-                onClick={() => handleQuestionSelect("What is the judgement?")}
-            >
-                Judgement
-            </li>
-            <li 
-                className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
-                onClick={() => handleQuestionSelect("What are the legal precedents for this case?")}
-            >
-                Legal Precedents
-            </li>
-            <li 
-                className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
-                onClick={() => handleQuestionSelect("What sections are referenced in this case?")}
-            >
-                Section References
-            </li>
-            <li 
-                className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
-                onClick={() => handleQuestionSelect("Can you provide a detailed case analysis?")}
-            >
-                Case Analysis
-            </li>
-        </ul>
-    )}
 </div>
 
 
@@ -947,45 +693,8 @@ const replacePlaceholdersWithReferences = (text, placeholderMap) => {
 
 
 
-                {/* Middle Section: Chat Input */}
-                <form onSubmit={sendMessage} className="flex items-center space-x-4 bg-white px-4 py-2 rounded-full flex-1 shadow-inner">
-                    <span className="text-gray-500 text-sm">{Object.keys(selectedSearchCases).length} Cases</span>
-
-                    <input
-                        type="text"
-                        value={inputMessage}
-                        onChange={(e) => setInputMessage(e.target.value)}
-                        placeholder="Type your message here..."
-                        className="flex-1 bg-transparent outline-none text-gray-700 placeholder-gray-400"
-                    />
-
-                    {/* Send Button */}
-                    <button
-                        type="submit"
-                        className="bg-gray-700 rounded-full flex items-center justify-center text-white hover:bg-blue-600 transition duration-200 p-2"
-                    >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                        </svg>
-                    </button>
-                </form>
-
-                {/* Right Section: Guide */}
-                <div className="flex items-center py-2 rounded-full">
-                    <div className='flex items-center px-3 py-2 m-auto rounded-full bg-gray-700 shadow-inner hover:bg-blue-600'
-                        onClick={saveChat}>
-                        <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
-                            <title>asterisk</title>
-                            <path d="M28.5 22.35l-10.999-6.35 10.999-6.351c0.231-0.131 0.385-0.375 0.385-0.655 0-0.414-0.336-0.75-0.75-0.75-0.142 0-0.275 0.040-0.388 0.108l0.003-0.002-11 6.35v-12.701c0-0.414-0.336-0.75-0.75-0.75s-0.75 0.336-0.75 0.75v0 12.7l-10.999-6.35c-0.11-0.067-0.243-0.106-0.385-0.106-0.414 0-0.75 0.336-0.75 0.75 0 0.28 0.154 0.524 0.381 0.653l0.004 0.002 10.999 6.351-10.999 6.35c-0.226 0.132-0.375 0.374-0.375 0.65 0 0.415 0.336 0.751 0.751 0.751 0 0 0 0 0.001 0h-0c0.138-0.001 0.266-0.037 0.378-0.102l-0.004 0.002 10.999-6.351v12.7c0 0.414 0.336 0.75 0.75 0.75s0.75-0.336 0.75-0.75v0-12.701l11 6.351c0.107 0.063 0.237 0.1 0.374 0.1 0.277 0 0.518-0.149 0.649-0.371l0.002-0.004c0.063-0.108 0.1-0.237 0.1-0.375 0-0.277-0.15-0.518-0.372-0.648l-0.004-0.002z"></path>
-                        </svg>
-
-                        <h2 className='mx-2 text-white font-semibold'>Save Chat</h2>
-                    </div>
-                </div>
-            </div>
-
             {/* Edit Mode Overlay for Desktop (Removed as it's handled within the component) */}
         </div>
     );
 }
-export default ChatWindow;
+export default SearchChatWindow;

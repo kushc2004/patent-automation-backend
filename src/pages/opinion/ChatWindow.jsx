@@ -725,52 +725,56 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
 
             {/* Chat Input Area */}
             <div className="flex items-center px-4 py-2 space-x-3 bg-gray-100">
-                {/* Left Section: Save Chat Button */}
-                <button
-                    
-                    className="bg-gray-700 rounded-full flex items-center justify-center text-white hover:bg-blue-600 transition duration-200 p-2"
-                >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M5 3a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V7.414a2 2 0 00-.586-1.414l-4-4A2 2 0 0014.586 2H5zm4 14a1 1 0 112 0 1 1 0 01-2 0zm0-4a1 1 0 012 0v3h2v-3a1 1 0 112 0v3h2v-5H9v5zM13 6V4h1.586L17 6.414V8h-4V6z"/>
-                    </svg>
-                </button>
+    {/* Left Section: Save Chat Button */}
+    <button
+        className="bg-gray-700 rounded-full flex items-center justify-center text-white hover:bg-blue-600 transition duration-200 p-2"
+    >
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M5 3a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V7.414a2 2 0 00-.586-1.414l-4-4A2 2 0 0014.586 2H5zm4 14a1 1 0 112 0 1 1 0 01-2 0zm0-4a1 1 0 012 0v3h2v-3a1 1 0 112 0v3h2v-5H9v5z" />
+        </svg>
+    </button>
 
-                {/* Middle Section: Chat Input */}
-                <form onSubmit={sendMessage} className="flex items-center space-x-4 bg-white px-4 py-2 rounded-full flex-1 shadow-inner">
-                    <span className="text-gray-500 text-sm">{Object.keys(fileUrls).length} Files</span>
+    {/* Middle Section: Chat Input */}
+    <form
+        onSubmit={sendMessage}
+        className="flex flex-1 items-center space-x-3 bg-white px-4 py-2 rounded-full shadow-inner"
+    >
+        <span className="text-gray-500 text-sm hidden sm:block">{Object.keys(fileUrls).length} Files</span>
 
-                    <input
-                        type="text"
-                        value={inputMessage}
-                        onChange={(e) => setInputMessage(e.target.value)}
-                        placeholder="Type your message here..."
-                        className="flex-1 bg-transparent outline-none text-gray-700 placeholder-gray-400"
-                    />
+        <input
+            type="text"
+            value={inputMessage}
+            onChange={(e) => setInputMessage(e.target.value)}
+            placeholder="Type your message here..."
+            className="flex-1 bg-transparent outline-none text-gray-700 placeholder-gray-400 w-full sm:w-auto sm:max-w-[70%]"
+        />
 
-                    {/* Send Button */}
-                    <button
-                        type="submit"
-                        className="bg-gray-700 rounded-full flex items-center justify-center text-white hover:bg-blue-600 transition duration-200 p-2"
-                    >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                        </svg>
-                    </button>
-                </form>
+        {/* Send Button */}
+        <button
+            type="submit"
+            className="bg-gray-700 rounded-full flex items-center justify-center text-white hover:bg-blue-600 transition duration-200 p-2"
+        >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+        </button>
+    </form>
 
-                {/* Right Section: Guide */}
-                <div className="flex items-center py-2 rounded-full">
-                    <div className='flex items-center px-3 py-2 m-auto rounded-full bg-gray-700 shadow-inner hover:bg-blue-600'
-                        onClick={saveChat}>
-                        <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
-                            <title>asterisk</title>
-                            <path d="M28.5 22.35l-10.999-6.35 10.999-6.351c0.231-0.131 0.385-0.375 0.385-0.655 0-0.414-0.336-0.75-0.75-0.75-0.142 0-0.275 0.040-0.388 0.108l0.003-0.002-11 6.35v-12.701c0-0.414-0.336-0.75-0.75-0.75s-0.75 0.336-0.75 0.75v0 12.7l-10.999-6.35c-0.11-0.067-0.243-0.106-0.385-0.106-0.414 0-0.75 0.336-0.75 0.75 0 0.28 0.154 0.524 0.381 0.653l0.004 0.002 10.999 6.351-10.999 6.35c-0.226 0.132-0.375 0.374-0.375 0.65 0 0.415 0.336 0.751 0.751 0.751 0 0 0 0 0.001 0h-0c0.138-0.001 0.266-0.037 0.378-0.102l-0.004 0.002 10.999-6.351v12.7c0 0.414 0.336 0.75 0.75 0.75s0.75-0.336 0.75-0.75v0-12.701l11 6.351c0.107 0.063 0.237 0.1 0.374 0.1 0.277 0 0.518-0.149 0.649-0.371l0.002-0.004c0.063-0.108 0.1-0.237 0.1-0.375 0-0.277-0.15-0.518-0.372-0.648l-0.004-0.002z"></path>
-                        </svg>
+    {/* Right Section: Save Chat */}
+    <div className="flex items-center justify-center py-2">
+        <div
+            className="flex items-center px-3 py-2 rounded-full bg-gray-700 shadow-inner hover:bg-blue-600"
+            onClick={saveChat}
+        >
+            <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+                <title>asterisk</title>
+                <path d="M28.5 22.35l-10.999-6.35 10.999-6.351c0.231-0.131 0.385-0.375 0.385-0.655 0-0.414-0.336-0.75-0.75-0.75-0.142 0-0.275 0.040-0.388 0.108l0.003-0.002-11 6.35v-12.701c0-0.414-0.336-0.75-0.75-0.75s-0.75 0.336-0.75 0.75v0 12.7l-10.999-6.35c-0.11-0.067-0.243-0.106-0.385-0.106-0.414 0-0.75 0.336-0.75 0.75 0 0.28 0.154 0.524 0.381 0.653l0.004 0.002 10.999 6.351-10.999 6.35c-0.226 0.132-0.375 0.374-0.375 0.65 0 0.415 0.336 0.751 0.751 0.751 0 0 0 0 0.001 0h-0c0.138-0.001 0.266-0.037 0.378-0.102l-0.004 0.002 10.999-6.351v12.7c0 0.414 0.336 0.75 0.75 0.75s0.75-0.336 0.75-0.75v0-12.701l11 6.351c0.107 0.063 0.237 0.1 0.374 0.1 0.277 0 0.518-0.149 0.649-0.371l0.002-0.004c0.063-0.108 0.1-0.237 0.1-0.375 0-0.277-0.15-0.518-0.372-0.648l-0.004-0.002z"></path>
+            </svg>
+            <h2 className="mx-2 text-white font-semibold sm:block">Save Chat</h2>
+        </div>
+    </div>
+</div>
 
-                        <h2 className='mx-2 text-white font-semibold'>Save Chat</h2>
-                    </div>
-                </div>
-            </div>
 
             {/* Edit Mode Overlay for Desktop (Removed as it's handled within the component) */}
         </div>

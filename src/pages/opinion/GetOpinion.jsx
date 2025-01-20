@@ -166,11 +166,11 @@ const GetOpinion = () => {
                 {/* Left Side */}
             <div className={`${
                     isDocumentCollapsed
-                        ? 'w-1/12 flex flex-col'
+                        ? 'md:w-1/12 w-0 flex flex-col'
                         : isCaseOverlayOpen
-                            ? 'w-1/2'
-                            : 'w-1/4'
-                } bg-gray-100 p-4 overflow-y-auto`}>
+                            ? 'md:w-1/2'
+                            : 'md:w-1/4'
+                } bg-gray-100 md:p-4 pt-4 px-4 overflow-y-auto -m-4 md:flex`}>
 
                     <div>
                         {/* Sidebar for Desktop */}
@@ -484,10 +484,10 @@ const GetOpinion = () => {
                     )}
                 </div> */}
 
-                <div className="flex-1 bg-white p-4">
+                <div className="flex-1 w-full bg-white pt-1 md:px-2">
 
 
-                    <div className={`flex-1 h-full transition-all duration-300 p-4 flex flex-col justify-center items-center rounded-3xl overflow-hidden`}>
+                    <div className={`flex-1 h-full transition-all duration-300 md:p-4 flex flex-col justify-center items-center rounded-3xl overflow-hidden`}>
                     {showChatWindow && (
                         <ChatWindow 
                             openCaseOverlay={openCaseOverlay} 

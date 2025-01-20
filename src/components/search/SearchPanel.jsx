@@ -1,8 +1,9 @@
-// Import required libraries (React, TailwindCSS, etc.)
-import React, { useState } from "react";
+// SearchPanel.jsx
+
+import React, { useState, useEffect } from "react";
 import axios from "axios";
 
-const SearchPanel = ({openCaseOverlay, isCaseOverlayOpen, setIsCaseOverlayOpen, setSelectedSearchCases, overlayContent, setSelectedOption}) => {
+const SearchPanel = ({ openCaseOverlay, isCaseOverlayOpen, setIsCaseOverlayOpen, setSelectedSearchCases, overlayContent, setSelectedOption }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -11,66 +12,67 @@ const SearchPanel = ({openCaseOverlay, isCaseOverlayOpen, setIsCaseOverlayOpen, 
   const [selectAll, setSelectAll] = useState(false);
   const [selectedCases, setSelectedCases] = useState([]);
 
-  setSelectedSearchCases(selectedCases);
+  // Persist selected cases to parent
+  useEffect(() => {
+    setSelectedSearchCases(selectedCases);
+  }, [selectedCases, setSelectedSearchCases]);
 
   const [uploadedFiles, setUploadedFiles] = useState([]);
-const [selectedFiles, setSelectedFiles] = useState([]);
+  const [selectedFiles, setSelectedFiles] = useState([]);
 
-const handleFileUpload = (event) => {
-  const files = Array.from(event.target.files);
+  const handleFileUpload = (event) => {
+    const files = Array.from(event.target.files);
 
-  const updatedFiles = files.map((file) => ({
-    originalName: file.name,
-    type: file.type,
-    url: URL.createObjectURL(file), // Create Blob URL
-  }));
+    const updatedFiles = files.map((file) => ({
+      originalName: file.name,
+      type: file.type,
+      url: URL.createObjectURL(file), // Create Blob URL
+    }));
 
-  setUploadedFiles((prev) => [...prev, ...updatedFiles]);
+    setUploadedFiles((prev) => [...prev, ...updatedFiles]);
 
-  // Save to local storage
-  const existingFiles = JSON.parse(localStorage.getItem("savedSearchFiles")) || [];
-  localStorage.setItem("savedSearchFiles", JSON.stringify([...existingFiles, ...updatedFiles]));
-};
+    // Save to local storage
+    const existingFiles = JSON.parse(localStorage.getItem("savedSearchFiles")) || [];
+    localStorage.setItem("savedSearchFiles", JSON.stringify([...existingFiles, ...updatedFiles]));
+  };
 
-const handleFileSelect = (file) => {
-  setSelectedFiles((prevSelected) => {
-    const isSelected = prevSelected.includes(file);
+  const handleFileSelect = (file) => {
+    setSelectedFiles((prevSelected) => {
+      const isSelected = prevSelected.includes(file);
 
-    const updatedSelectedFiles = isSelected
-      ? prevSelected.filter((item) => item !== file)
-      : [...prevSelected, file];
+      const updatedSelectedFiles = isSelected
+        ? prevSelected.filter((item) => item !== file)
+        : [...prevSelected, file];
 
-    saveToLocalStorage(updatedSelectedFiles);
-    return updatedSelectedFiles;
-  });
-};
+      saveToLocalStorage(updatedSelectedFiles);
+      return updatedSelectedFiles;
+    });
+  };
 
-const handleSelectAllFiles = () => {
-  if (selectedFiles.length === uploadedFiles.length) {
-    setSelectedFiles([]);
-    saveToLocalStorage([]);
-  } else {
-    setSelectedFiles([...uploadedFiles]);
-    saveToLocalStorage([...uploadedFiles]);
-  }
-};
+  const handleSelectAllFiles = () => {
+    if (selectedFiles.length === uploadedFiles.length) {
+      setSelectedFiles([]);
+      saveToLocalStorage([]);
+    } else {
+      setSelectedFiles([...uploadedFiles]);
+      saveToLocalStorage([...uploadedFiles]);
+    }
+  };
 
-const saveToLocalStorage = (files) => {
-  localStorage.setItem("savedSelectedFiles", JSON.stringify(files));
-};
-
-  
+  const saveToLocalStorage = (files) => {
+    localStorage.setItem("savedSelectedFiles", JSON.stringify(files));
+  };
 
   // Function to handle search
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
-  
+
     setIsLoading(true);
     try {
       // Send search query to the backend
       const formData = new URLSearchParams();
       formData.append("query", searchQuery);
-  
+
       async function fetchAndFilterCases(formData) {
         try {
           const searchResponse = await axios.post(
@@ -113,15 +115,6 @@ const saveToLocalStorage = (files) => {
             (caseItem) => caseItem.normalized_distance <= percentileThreshold
           );
       
-          // Print filtered cases
-          // filteredCases.forEach((caseItem) => {
-          //   console.log(
-          //     `Case ID: ${caseItem.case_id}, Distance: ${caseItem.distance}, Normalized Distance: ${caseItem.normalized_distance.toFixed(
-          //       2
-          //     )}`
-          //   );
-          // });
-      
           return filteredCases;
         } catch (error) {
           console.error("Error fetching and filtering cases:", error);
@@ -129,17 +122,17 @@ const saveToLocalStorage = (files) => {
       }
 
       const similarCases = await fetchAndFilterCases(formData);
-  
+
       // Fetch detailed case JSON for each case_id
       const caseDetailsPromises = similarCases.map(async (caseObj) => {
         const caseId = caseObj.case_id;
         const caseJsonResponse = await axios.get(`https://legalai-backend-1.onrender.com/fetch-case-json/${caseId}`);
         return caseJsonResponse.data.case_json; // Return the detailed case JSON
       });
-  
+
       // Wait for all case details to resolve
       const detailedCases = await Promise.all(caseDetailsPromises);
-  
+
       // Update search results state
       setSearchResults(detailedCases);
     } catch (error) {
@@ -152,7 +145,6 @@ const saveToLocalStorage = (files) => {
   const handleCaseClick = async (caseId) => {
     try {
       const response = await axios.get(`https://legalai-backend-1.onrender.com/fetch-case-text/${caseId}`);
-      // setActiveCaseText(response.data);
       setActiveCaseText({ ...response.data, case_id: caseId });
       openCaseOverlay(response.data.paragraphs)
     } catch (error) {
@@ -166,7 +158,6 @@ const saveToLocalStorage = (files) => {
         return prevSelected.filter((item) => item !== caseJson);
       }
       return [...prevSelected, caseJson];
-      
     });
   };
   
@@ -195,19 +186,15 @@ const saveToLocalStorage = (files) => {
     }
 
   return (
-    <div className="bg-[#EFF3F6] p-6 rounded-2xl my-4 overflow-y-auto flex-shrink-0 shadow-md">
+    <div className="bg-[#EFF3F6] p-6 rounded-2xl my-4 overflow-y-auto flex-grow shadow-md">
 
-      {/* Upload Files Section */}
-
+      {/* Back Button */}
       <button
-                                onClick={() => setSelectedOption(null)} // Go back to the option selection screen
-                                className="bg-gray-700 text-white px-4 py-2 rounded-lg shadow-md hover:bg-blue-600 focus:outline-none"
-                            >
-                                Back
+        onClick={() => setSelectedOption(null)} // Go back to the option selection screen
+        className="bg-gray-700 text-white px-4 py-2 rounded-lg shadow-md hover:bg-blue-600 focus:outline-none mb-4"
+      >
+        Back
       </button>
-
-
-
 
       {/* Search Box */}
       <div className="flex items-center bg-white py-1 px-2 my-4 rounded-xl shadow-sm border border-gray-300">
@@ -253,18 +240,15 @@ const saveToLocalStorage = (files) => {
                 <label className="ml-2 text-sm text-gray-700">Select All</label>
         </div>
 
-
-
         {isLoading ? (
             <p className="text-center text-gray-500">Loading...</p>
         ) : searchResults.length > 0 ? (
             !isCaseOverlayOpen ? (
-            <ul className="space-y-4 max-h-[80vh] overflow-y-auto">
+            <ul className="space-y-4 max-h-[60vh] overflow-y-auto">
                 {searchResults.map((result, index) => (
-                <div className="flex flex-1">
+                <div className="flex items-start" key={index}>
                     <li
-                        key={index}
-                        className="w-[90%] p-3 bg-white border border-gray-200 rounded-lg shadow-md hover:shadow-lg transition duration-300 ease-in-out"
+                        className="w-full p-3 bg-white border border-gray-200 rounded-lg shadow-md hover:shadow-lg transition duration-300 ease-in-out cursor-pointer"
                         onClick={() =>{ 
                           handleCaseClick(result.case_id);
                           handleSelectCase(result);
@@ -288,7 +272,6 @@ const saveToLocalStorage = (files) => {
                               ) : null
                             )}
                         </div>
-
                     </li>
                     <input
                       type="checkbox"
@@ -310,11 +293,6 @@ const saveToLocalStorage = (files) => {
 
                 <h3 className="text-lg font-bold mb-4 flex justify-between items-center">
                   Case Details
-                  {console.log("Active Case Text:", activeCaseText)}
-                  {console.log(
-                      "Active Case Result:",
-                      searchResults?.find((result) => result.case_id === activeCaseText?.case_id)
-                  )}
                   {searchResults?.find((result) => result.case_id === activeCaseText?.case_id)?.doc_link ? (
                       <button
                           onClick={() =>
@@ -337,7 +315,7 @@ const saveToLocalStorage = (files) => {
                   )}
               </h3>
 
-                <div className="text-gray-800 overflow-auto h-full max-h-[76vh]">
+                <div className="text-gray-800 overflow-auto h-full max-h-[60vh]">
 
                 {typeof activeCaseText !== "string" ? (
 
