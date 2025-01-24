@@ -6,7 +6,7 @@ import Papa from 'papaparse';
 import TopBar from '../../components/TopBar';
 
 
-const categoryOptions = ["Criminal", "Civil", "Family", "Corporate", "Others"];
+const categoryOptions = ["Family", "Property Dispute"];
 const caseStateOptions = ["Pending", "Pre-final", "Not started yet", "Other"];
 
 
@@ -26,6 +26,10 @@ function GetOpinionForm() {
     const [acceptedTerms, setAcceptedTerms] = useState(false);
     const [subscribe, setSubscribe] = useState(false);
     const [statesWithCities, setStatesWithCities] = useState({});
+
+    const [uniqueIdentifier] = useState(
+        sessionStorage.getItem("uniqueIdentifier") || "defaultUser"
+      );
 
     useEffect(() => {
         const fetchCityStateData = async () => {
@@ -54,17 +58,66 @@ function GetOpinionForm() {
         fetchCityStateData();
     }, []);
 
+    const uploadFileToBackend = async (file) => {
+        const formData = new FormData();
+        formData.append("folder_name", `users/${uniqueIdentifier}/opinion`);
+        formData.append("file", file); // Directly append the file object
+    
+        console.log("Uploading file:", file);
+    
+        const response = await fetch(
+            "https://legalai-backend-1.onrender.com/api/upload_file",
+            {
+                method: "POST",
+                body: formData,
+                credentials: "include",
+            }
+        );
+    
+        if (!response.ok) {
+            throw new Error("Failed to upload file");
+        }
+    
+        const result = await response.json();
+        return result.message; // Return success message from the backend
+    };
+    
+
+    // const handleFileUpload = async (event) => {
+    //     const files = Array.from(event.target.files);
+    //     const fileData = await Promise.all(files.map(file => new Promise((resolve, reject) => {
+    //         const reader = new FileReader();
+    //         reader.onloadend = () => resolve({ name: file.name, type: file.type, size: file.size, data: reader.result.split(',')[1] });
+    //         reader.onerror = reject;
+    //         reader.readAsDataURL(file);
+    //     })));
+    //     setUploadedFiles(fileData);
+    //     toast.success("Document(s) uploaded successfully.");
+    // };
+
     const handleFileUpload = async (event) => {
         const files = Array.from(event.target.files);
-        const fileData = await Promise.all(files.map(file => new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve({ name: file.name, type: file.type, size: file.size, data: reader.result.split(',')[1] });
-            reader.onerror = reject;
-            reader.readAsDataURL(file);
-        })));
-        setUploadedFiles(fileData);
-        toast.success("Document(s) uploaded successfully.");
+    
+        try {
+            // Loop through each file and upload to the backend
+            const uploadedFileMessages = await Promise.all(
+                files.map(async (file) => {
+                    const message = await uploadFileToBackend(file); // Call the upload function
+                    return { name: file.name, message };
+                })
+            );
+    
+            setUploadedFiles((prev) => [
+                ...prev,
+                ...uploadedFileMessages.map(({ name }) => ({ name })),
+            ]);
+            toast.success("Document(s) uploaded successfully.");
+        } catch (error) {
+            console.error("Error uploading files:", error);
+            toast.error("Failed to upload document(s). Please try again.");
+        }
     };
+    
 
     const handleSubmit = () => {
         const formData = {
@@ -265,34 +318,6 @@ function GetOpinionForm() {
                             placeholder="Provide details"
                         />
                     </div>
-
-                    {/* Terms and Subscribe Checkboxes */}
-                    {/* <div className="flex items-start space-x-4">
-                        <div className="flex items-center">
-                            <input
-                                type="checkbox"
-                                checked={acceptedTerms}
-                                onChange={(e) => setAcceptedTerms(e.target.checked)}
-                                className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                            />
-                            <label className="ml-2 text-sm text-gray-600">
-                                I accept the <a href="#" className="text-blue-500 underline">Terms of use</a> & <a href="#" className="text-blue-500 underline">Privacy policy</a>
-                            </label>
-                        </div>
-                        <div className="flex items-center">
-                            <input
-                                type="checkbox"
-                                checked={subscribe}
-                                onChange={(e) => setSubscribe(e.target.checked)}
-                                className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                            />
-                            <label className="ml-2 text-sm text-gray-600">
-                                Subscribe to our email notifications to stay up to date
-                            </label>
-                        </div>
-                    </div> */}
-
-                    {/* Analyse Button */}
                     <div className="text-center">
                         <button
                             type="button"

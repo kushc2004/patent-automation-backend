@@ -26,6 +26,10 @@ const GetOpinion = () => {
     const [selectedSearchCases, setSelectedSearchCases] = useState([]);
     const navigate = useNavigate();
 
+    const [uniqueIdentifier] = useState(
+        sessionStorage.getItem("uniqueIdentifier") || "defaultUser"
+      );
+
 
     useEffect(() => {
 
@@ -47,7 +51,11 @@ const GetOpinion = () => {
 
             // Fetch Chat Histories from Backend
             try {
-                const response = await axios.get('https://legalai-backend-1.onrender.com/api/get_chat_histories', { withCredentials: true });
+                const response = await axios.post(
+                    `https://legalai-backend-1.onrender.com/api/get_chat_histories`,
+                    { file_path: `/var/data/users/${uniqueIdentifier}/opinion/chat_history.json` },
+                    { withCredentials: true }
+                );                
                 if (response.data.chat_histories) {
                     setChatHistories(response.data.chat_histories);
                 }

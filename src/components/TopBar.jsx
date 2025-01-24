@@ -11,28 +11,6 @@ const TopBar = () => {
                 sessionStorage.getItem("uniqueIdentifier") || null
             );
 
-
-    // useEffect(() => {
-    //         let index = 0;
-    //         const typingSpeed = 200; // Time delay for typing (in milliseconds)
-    //         const pauseTime = 1; // Pause time at the end of the animation
-    //         const interval = setInterval(() => {
-    //             setText((prevText) =>
-    //                 index < fullText.length ? fullText.slice(0, index + 1) : ""
-    //             );
-        
-    //             if (index === fullText.length) {
-    //                 setTimeout(() => {
-    //                     index = 0; // Reset index after the pause
-    //                 }, pauseTime);
-    //             } else {
-    //                 index = (index + 1) % (fullText.length + 1);
-    //             }
-    //         }, typingSpeed);
-        
-    //         return () => clearInterval(interval);
-    //     }, []);
-
         const fetchFile = async (filePath) => {
             try {
                 const response = await axios.post(

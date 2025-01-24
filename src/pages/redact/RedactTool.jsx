@@ -125,6 +125,8 @@ const RedactTool = () => {
                 formData.append("folder_name", `users/${uniqueIdentifier}`); // Specify the folder name
                 formData.append("file", file); // Add the file
 
+                console.log("file: ", file);
+
                 const uploadFileResponse = await fetch(
                     "https://legalai-backend-1.onrender.com/api/upload_file",
                     {
@@ -395,8 +397,8 @@ const RedactTool = () => {
                             ))}
                         </ul>
 
-                        <p className="text-sm sm:text-base text-blue-500 mt-4 text-center">
-                            Upload up to 5 PDF or Word files. We don’t store your files.
+                        <p className="text-sm sm:text-base text-gray-500 mt-4 text-center">
+                            * Currently supporting maximum of 10 pages
                         </p>
 
                         <button

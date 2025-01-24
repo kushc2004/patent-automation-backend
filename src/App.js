@@ -12,6 +12,8 @@ import GetOpinion from './pages/opinion/GetOpinion'
 import GetOpinionForm from './pages/opinion/GetOpinionForm'
 import SearchPage from './pages/search/SearchPage'
 import RedactTool from './pages/redact/RedactTool'
+import PatentPage from './pages/patent/PatentPage'
+import DraftPage from './pages/patent/DraftPage';
 
 
 function App() {
@@ -31,6 +33,8 @@ function App() {
     <Route path="/get-opinion" element={<GetOpinion />} />
     <Route path="/search" element={<SearchPage />} />
     <Route path="/redact" element={<RedactTool />} />
+    <Route path="/patent" element={<PatentPage />} />
+    <Route path="/draft" element={<DraftPage />} />
     <Route path="/chat-form" element={<CaseForm />} />
     <Route path="/chat" element={<ChatPage />} />
     <Route path="/select" element={<SelectPage />} />

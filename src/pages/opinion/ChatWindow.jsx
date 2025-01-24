@@ -113,6 +113,10 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
 
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
+    const [uniqueIdentifier] = useState(
+        sessionStorage.getItem("uniqueIdentifier") || "defaultUser"
+      );
+
     useEffect(() => {
         if (chatContainerRef.current) {
             chatContainerRef.current.scrollIntoView({ behavior: 'smooth' });
@@ -131,6 +135,22 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
             setMessages(initialHistory);
         }
     }, [activeChat]);
+
+    useEffect(() => {
+        const handleBeforeUnload = (event) => {
+            saveChat();
+            event.preventDefault();
+            event.returnValue = "";
+        };
+
+        window.addEventListener("beforeunload", handleBeforeUnload);
+
+        return () => {
+            window.removeEventListener("beforeunload", handleBeforeUnload);
+        };
+    }, [messages, caseCategory, activeChat]);
+
+
 
     // Helper function to strip HTML tags and get plain text
     const stripHtml = (html) => {
@@ -513,7 +533,8 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
         try {
             const response = await axios.post('https://legalai-backend-1.onrender.com/api/save_chat_history', {
                 chat_history: messages,
-                chat_title: activeChat?.title || `${caseCategory}: ${new Date().toLocaleString()}`
+                chat_title: activeChat?.title || `${caseCategory}: ${new Date().toLocaleString()}`,
+                file_path: `/var/data/users/${uniqueIdentifier}/opinion/chat_history.json`
             }, {
                 withCredentials: true,
                 headers: {
