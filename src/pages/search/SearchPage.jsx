@@ -2,15 +2,14 @@
 
 import React, { useEffect, useState } from 'react';
 import SearchChatWindow from './SearchChatWindow';
-import SearchPanel from '../../components/search/SearchPanel';
+import SearchPanel from '../../components/search/SearchPanel'
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import axios from 'axios';
-import { Transition } from '@headlessui/react'; // For smooth transitions
 import { MenuIcon, XIcon } from '@heroicons/react/outline'; // Icons for menu
 import { useNavigate } from 'react-router-dom';
 
-const SearchPage = () => {
+const ChatPage = () => {
     const [files, setFiles] = useState([]);
     const [selectedFiles, setSelectedFiles] = useState([]);
     const [showChatWindow, setShowChatWindow] = useState(false);
@@ -26,39 +25,20 @@ const SearchPage = () => {
     const [selectedSearchCases, setSelectedSearchCases] = useState([]);
     const navigate = useNavigate();
 
+    const [uniqueIdentifier] = useState(
+        sessionStorage.getItem("uniqueIdentifier") || "defaultUser"
+      );
 
-    useEffect(() => {
 
-        // sessionStorage.removeItem("getOpinion");
-        setSelectedOption(null);
 
-        const fetchInitialData = async () => {
-            const storedData = JSON.parse(sessionStorage.getItem("caseFormData")) || {};
-            const uploadedFiles = storedData.document || [];
-            setFiles(uploadedFiles);
-            setShowChatWindow(true);
-
-            // Check if the selectedOption was saved and set it
-            if (storedData.selectedOption) {
-                setSelectedOption(storedData.selectedOption);
-            } else {
-                setShowChatWindow(true);
-            }
-
-            // Fetch Chat Histories from Backend
-            try {
-                const response = await axios.get('https://legalai-backend-1.onrender.com/api/get_chat_histories', { withCredentials: true });
-                if (response.data.chat_histories) {
-                    setChatHistories(response.data.chat_histories);
-                }
-            } catch (error) {
-                console.error("Error fetching chat histories:", error.message);
-                toast.error("Error fetching chat histories.");
-            }
-        };
-
-        fetchInitialData();
-    }, []);
+    const handleOpenFile = (file) => {
+        const byteCharacters = atob(file.data);
+        const byteNumbers = new Array(byteCharacters.length).fill(null).map((_, i) => byteCharacters.charCodeAt(i));
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: file.type });
+        const blobUrl = URL.createObjectURL(blob);
+        window.open(blobUrl, '_blank');
+    };
 
     const openCaseOverlay = (content) => {
         setIsDocumentCollapsed(false);
@@ -123,7 +103,7 @@ const SearchPage = () => {
     return (
         <div className="flex flex-col h-screen w-screen">
             <ToastContainer />
-
+            
             {/* Top Navigation Bar for Mobile */}
             <div className="md:hidden bg-[#EFF3F6] p-4 flex items-center justify-between">
                 <div className="flex items-center">
@@ -139,16 +119,17 @@ const SearchPage = () => {
                 </button>
             </div>
 
-            <div className="flex flex-1 overflow-hidden relative">
+            <div className="flex flex-1  overflow-hidden">
                 
-                {/* Sidebar for Desktop */}
-                <div className={`hidden md:block ${
-                        isDocumentCollapsed
-                            ? 'w-1/12'
-                            : isCaseOverlayOpen
-                                ? 'w-1/2'
-                                : 'w-1/4'
-                    } bg-gray-100 p-4 overflow-y-auto`}>
+                {/* Left Side */}
+            <div className={`${
+                    isDocumentCollapsed
+                        ? 'w-1/12'
+                        : isCaseOverlayOpen
+                            ? 'w-1/2'
+                            : 'w-1/4'
+                } bg-gray-100 p-4 overflow-y-auto`}>
+
                     <div>
                         <SearchPanel
                             openCaseOverlay={openCaseOverlay}
@@ -158,62 +139,12 @@ const SearchPage = () => {
                             overlayContent={overlayContent}
                             setSelectedOption={setSelectedOption}
                         >
-                        </SearchPanel>
+                            </SearchPanel>
                     </div>
-                </div>
 
-                {/* Mobile Sidebar */}
-                <Transition show={isMobileSidebarOpen} as={React.Fragment}>
-                    <div className="fixed inset-0 z-40 flex">
-                        <Transition.Child
-                            as={React.Fragment}
-                            enter="transition-opacity ease-linear duration-300"
-                            enterFrom="opacity-0"
-                            enterTo="opacity-100"
-                            leave="transition-opacity ease-linear duration-300"
-                            leaveFrom="opacity-100"
-                            leaveTo="opacity-0"
-                        >
-                            <div className="fixed inset-0 bg-black bg-opacity-25" onClick={toggleMobileSidebar}></div>
-                        </Transition.Child>
+            </div>
 
-                        <Transition.Child
-                            as={React.Fragment}
-                            enter="transition ease-in-out duration-300 transform"
-                            enterFrom="-translate-x-full"
-                            enterTo="translate-x-0"
-                            leave="transition ease-in-out duration-300 transform"
-                            leaveFrom="translate-x-0"
-                            leaveTo="-translate-x-full"
-                        >
-                            <div className={`relative flex-1 flex flex-col bg-gray-100 p-4 overflow-y-auto`}>
-                                <div className="absolute top-0 right-0 -mr-12 pt-2">
-                                    <button
-                                        className="ml-1 flex items-center justify-center h-10 w-10 rounded-full focus:outline-none focus:bg-gray-600"
-                                        onClick={toggleMobileSidebar}
-                                    >
-                                        <XIcon className="h-6 w-6 text-white" />
-                                    </button>
-                                </div>
-                                <SearchPanel
-                                    openCaseOverlay={openCaseOverlay}
-                                    isCaseOverlayOpen={isCaseOverlayOpen}
-                                    setIsCaseOverlayOpen={setIsCaseOverlayOpen}
-                                    setSelectedSearchCases={setSelectedSearchCases}
-                                    overlayContent={overlayContent}
-                                    setSelectedOption={setSelectedOption}
-                                />
-                            </div>
-                        </Transition.Child>
-
-                        <div className="flex-shrink-0 w-14" aria-hidden="true">
-                            {/* Dummy element to force sidebar to shrink to fit close icon */}
-                        </div>
-                    </div>
-                </Transition>
-
-                {/* Main Content Area */}
-                <div className="flex-1 w-full bg-white p-4 flex flex-col">
+                <div className="flex-1 bg-white p-4">
                     <SearchChatWindow 
                         openCaseOverlay={openCaseOverlay} 
                         setIsDocumentCollapsed={toggleDocumentCollapse}
@@ -221,7 +152,13 @@ const SearchPage = () => {
                         activeChat={activeChat}
                         selectedSearchCases={selectedSearchCases}
                     />
-                </div>
+
+                {!selectedOption && (
+                    <div className="text-gray-500 text-center">
+                        <p>Select an option on the left to get started.</p>
+                    </div>
+                )}
+            </div>
 
             </div>
         </div>
@@ -229,4 +166,4 @@ const SearchPage = () => {
 
 };
 
-export default SearchPage;
+export default ChatPage;

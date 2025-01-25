@@ -236,6 +236,7 @@ const Home = () => {
         ...(uniqueIdentifier === "110076670715218464191" || uniqueIdentifier === "105155585129049510954" ? [
             { title: "Redact", description: "Redact sensitive information securely.", path: "/redact" },
             { title: "Patent", description: "Draft Patent.", path: "/patent" },
+            { title: "Admin Dashboard", description: "Dashboard for Admin to see the user activities.", path: "/admin" },
         ] : [])
     ];
 

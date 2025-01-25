@@ -247,14 +247,27 @@ const LoginPage = () => {
     
 
     return (
-        <main className="flex flex-col md:flex-row h-screen">
+        <main className="flex flex-col md:flex-row h-screen"
+        style={{ backgroundImage: "url('assets/img/loginBg.png')" }}>
             {/* Left Side - Carousel */}
             
-            <section className="flex flex-col justify-center items-center bg-[#1F1515] p-8 w-full md:w-1/2 h-full text-white relative">
+            <section className="flex flex-col justify-center items-center  p-8 w-full md:w-1/2 h-full text-white relative"
+            >
                 <div className="absolute top-4 text-center w-full m-auto md:top-8">
-                    <h1 className="text-4xl font-bold mt-8">Banthry AI</h1>
-                    <h1 className="text-2xl font-bold mt-4 text-gray-300">Your AI Legal Companion</h1>
-                </div>
+                    <h1
+                        className="text-5xl font-bold mt-8 text-gray-900"
+                        style={{ textShadow: "2px 2px 2px rgba(0, 0, 0, 0.2)" }}
+                    >
+                        Banthry AI
+                    </h1>
+                    <h1
+                        className="text-3xl font-bold mt-4 text-gray-700"
+                        style={{ textShadow: "1px 1px 1px rgba(0, 0, 0, 0.2)" }}
+                    >
+                        Your AI Legal Companion
+                    </h1>
+                    </div>
+
 
                 {/* Content Section */}
                 <div className="text-center p-8 bg-[#252525] rounded-lg shadow-lg max-w-md relative">
@@ -287,8 +300,8 @@ const LoginPage = () => {
 
             {/* Right Side - Login Form */}
             
-            <section className="flex flex-col w-full md:w-1/2 h-full bg-gradient-to-r from-gray-50 to-white p-4 items-center justify-center">
-                <div className="flex flex-col justify-center items-center py-7 w-full bg-[linear-gradient(104deg,#C2FEFE_0.01%,rgba(255,228,199,0.20_99.99%))] rounded-3xl max-w-md">
+            <section className="flex flex-col w-full md:w-1/2 h-full p-4 items-center justify-center">
+                <div className="flex flex-col justify-center items-center py-16 px-8 w-full bg-gradient-to-r from-gray-50 to-white rounded-3xl max-w-md">
                     <img
                                 src="assets/img/logo.svg"
                                 alt="Banthry AI Logo"

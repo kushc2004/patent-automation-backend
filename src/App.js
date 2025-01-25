@@ -14,6 +14,8 @@ import SearchPage from './pages/search/SearchPage'
 import RedactTool from './pages/redact/RedactTool'
 import PatentPage from './pages/patent/PatentPage'
 import DraftPage from './pages/patent/DraftPage';
+import AdminPage from './pages/admin/AdminPage';
+import FeatureView from './pages/admin/FeatureView';
 
 
 function App() {
@@ -38,6 +40,8 @@ function App() {
     <Route path="/chat-form" element={<CaseForm />} />
     <Route path="/chat" element={<ChatPage />} />
     <Route path="/select" element={<SelectPage />} />
+    <Route path="/admin" element={<AdminPage />} />
+    <Route path="/feature/:feature" element={<FeatureView />} />
     <Route path="*" element={<Navigate to="/" />} />
   </Routes>
 </Router>
