@@ -33,9 +33,11 @@ def submit():
     """Handles form submission requests."""
     data = request.get_json()
     session_id = str(uuid.uuid4())
+
     # Start the automation in the background
-    eventlet.spawn_n(eventlet.wrap_async(automate_submission), data, session_id)
+    eventlet.spawn_n(asyncio.run, automate_submission(data, session_id))
     return jsonify({'session_id': session_id}), 200
+
 
 
 @socketio.on('join')
