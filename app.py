@@ -13,7 +13,7 @@ import base64
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'Legal.ai*2024'  # Replace with a strong secret key
-socketio = SocketIO(app, async_mode='eventlet')
+socketio = SocketIO(app, async_mode='eventlet', cors_allowed_origins="*")
 
 CORS(app, resources={
     r"/*": {
