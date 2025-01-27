@@ -41,14 +41,19 @@ def submit():
 @socketio.on('join')
 def on_join(data):
     """Handles a client joining a session room."""
-    session_id = data['session_id']
-    join_room(session_id)
-    print(f'Client joined room: {session_id}')
+    session_id = data.get('session_id')
+    if session_id:
+        join_room(session_id)
+        print(f"Client joined room: {session_id}")
+    else:
+        print("Error: No session_id provided in join event.")
+
 
 
 async def automate_submission(user_data, session_id):
     """Performs the automation task for form submission."""
     try:
+        print(f"Starting automation for session: {session_id}")
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=False)
             context = await browser.new_context()
@@ -57,13 +62,13 @@ async def automate_submission(user_data, session_id):
             await emit_log(session_id, 'Launching browser...')
             await page.goto('https://fluentforms.com/forms/contact-form-demo/')
             await emit_log(session_id, 'Navigated to form website.')
+            print(f"Navigated to form website for session: {session_id}")
             await take_screenshot(page, session_id, 'Navigated to form website.')
 
             # Fill out the form
             await emit_log(session_id, 'Filling out the form...')
             await page.fill('#name', user_data.get('name', ''))
             await page.fill('#email', user_data.get('email', ''))
-            # Add other form fields as necessary
             await take_screenshot(page, session_id, 'Filled out the form.')
 
             # Submit the form
@@ -81,7 +86,8 @@ async def automate_submission(user_data, session_id):
                 await emit_log(session_id, 'Confirmation message not found. Verify submission.')
 
     except Exception as e:
-        await emit_log(session_id, f'Error occurred: {str(e)}')
+        print(f"Error in automation for session {session_id}: {str(e)}")
+        await emit_log(session_id, f"Error occurred: {str(e)}")
     finally:
         if 'browser' in locals():
             await browser.close()
@@ -93,17 +99,24 @@ async def emit_log(session_id, message):
 
 
 async def take_screenshot(page, session_id, step_description):
+    """Takes a screenshot and emits it to the session room."""
     try:
-        screenshot = await page.screenshot(full_page=False, quality=50)
-        screenshot_base64 = base64.b64encode(screenshot).decode('utf-8')
-        print(f"Emitting screenshot for session {session_id}: {screenshot_base64[:50]}...")  # First 50 chars for verification
+        print(f"Taking screenshot for session: {session_id}, step: {step_description}")
+        screenshot_bytes = await page.screenshot()  # Capture screenshot as bytes
+        screenshot_base64 = base64.b64encode(screenshot_bytes).decode('utf-8')  # Encode as Base64
+        print(f"Screenshot captured for session: {session_id}")
+
+        # Emit the screenshot and log
         socketio.emit('process-screenshot', {
             'description': step_description,
             'screenshot': screenshot_base64
         }, room=session_id)
-        await emit_log(session_id, f'Screenshot taken: {step_description}')
+        print(f"Screenshot emitted for session: {session_id}")
+        await emit_log(session_id, f"Screenshot taken: {step_description}")
     except Exception as e:
-        await emit_log(session_id, f'Failed to take screenshot: {str(e)}')
+        print(f"Error in taking screenshot for session {session_id}: {str(e)}")
+        await emit_log(session_id, f"Failed to take screenshot: {str(e)}")
+
 
 
 if __name__ == '__main__':
