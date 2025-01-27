@@ -26,6 +26,7 @@ CORS(app, resources={
     }
 })
 
+print("Server started.")
 
 @app.route('/api/submit', methods=['POST'])
 def submit():
