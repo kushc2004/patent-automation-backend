@@ -167,6 +167,7 @@ const FeatureView = () => {
             <ChatHistory
               chatHistories={chatHistories}
               onBack={() => setSelectedUser(null)} // Return to user list
+              uniqueIdentifier={selectedUser.uniqueIdentifier}
             />
           )
         ) : (

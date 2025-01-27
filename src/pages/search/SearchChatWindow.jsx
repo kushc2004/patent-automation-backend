@@ -112,12 +112,13 @@ const client = async (prompt, history) => {
 };
 
 
-const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, activeChat, selectedSearchCases }) => {
+const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, activeChat, selectedSearchCases,
+    messages, setMessages
+ }) => {
     const initialHistory = [
         { text: "Hello! I am Banthry AI, <br> Here to assist your legal queries. Please enter query to search cases.", sender: 'model' }
     ];
     
-    const [messages, setMessages] = useState(initialHistory);
     const [opinionDirection, setOpinionDirection] = useState(null);
     const [editMode, setEditMode] = useState(false);
     const [editContent, setEditContent] = useState('');

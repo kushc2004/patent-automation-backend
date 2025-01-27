@@ -1,9 +1,11 @@
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, useState } from "react";
 import Message from "./Message";
 import { toast } from "react-toastify";
+import axios from "axios";
 
-const ChatHistory = ({ chatHistories, onBack }) => {
-  const [activeChat, setActiveChat] = React.useState(null);
+const ChatHistory = ({ chatHistories, onBack, uniqueIdentifier }) => {
+  const [activeChat, setActiveChat] = useState(null);
+  const [uploadedFiles, setUploadedFiles] = useState([]);
   const chatContainerRef = useRef(null);
 
   useEffect(() => {
@@ -12,8 +14,46 @@ const ChatHistory = ({ chatHistories, onBack }) => {
     }
   }, [activeChat]);
 
-  const handleChatClick = (chat) => {
+  const handleChatClick = async (chat) => {
     setActiveChat(chat);
+
+    // Extract and fetch uploaded files from the first message
+    const firstMessage = chat.messages[0]?.text || "";
+    if (firstMessage.includes("<b>Uploaded Files:</b>")) {
+      try {
+        // Extract file names from the "Uploaded Files" section
+
+
+        const fileNames = firstMessage
+          .match(/<ul>(.*?)<\/ul>/)?.[1] // Extract the contents of <ul>
+          .split("</li>") // Split by list items
+          .filter((item) => item.trim() !== "") // Remove empty items
+          .map((item) => item.replace(/<li>/g, "").trim()); // Remove <li> tags and trim spaces
+
+        // Fetch each file using the backend API
+        const filePromises = fileNames.map(async (fileName) => {
+          const filePath = `/var/data/users/${uniqueIdentifier}/opinion/${fileName}`;
+          console.log(filePath);
+          const response = await axios.post(
+            "https://legalai-backend-1.onrender.com/api/get_file",
+            { file_path: filePath },
+            {
+              headers: { "Content-Type": "application/json" },
+              responseType: "json",
+            }
+          );
+          return { name: fileName, data: response.data };
+        });
+
+        const files = await Promise.all(filePromises);
+        setUploadedFiles(files);
+      } catch (error) {
+        console.error("Error fetching uploaded files:", error.message);
+        toast.error("Error fetching uploaded files.");
+      }
+    } else {
+      setUploadedFiles([]);
+    }
   };
 
   return (
@@ -58,15 +98,48 @@ const ChatHistory = ({ chatHistories, onBack }) => {
             {activeChat.title}
           </h3>
           <div
-            className="overflow-y-auto max-h-96 p-4 border rounded-lg"
+            className="overflow-y-auto max-h-[70vh] p-4 border rounded-lg"
             ref={chatContainerRef}
           >
+
+            {uploadedFiles.length > 0 && (
+                          <div className="mt-6">
+                            <h4 className="text-lg font-semibold text-gray-700 mb-2">Uploaded Files:</h4>
+                            <ul className="space-y-2">
+              {uploadedFiles.map((file, index) => (
+                <li
+                  key={index}
+                  className="text-blue-500 underline cursor-pointer"
+                  onClick={async () => {
+                    try {
+                      const filePath = `/var/data/users/${uniqueIdentifier}/opinion/${file.name}`;
+                      const response = await axios.post(
+                        "https://legalai-backend-1.onrender.com/api/get_file",
+                        { file_path: filePath },
+                        {
+                          headers: { "Content-Type": "application/json" },
+                          responseType: "blob", // Ensure binary data is handled
+                        }
+                      );
+
+                      const blob = new Blob([response.data], { type: response.headers['content-type'] });
+                      const url = URL.createObjectURL(blob);
+                      window.open(url, "_blank", "noopener,noreferrer"); // Open the file in a new tab
+                    } catch (error) {
+                      console.error("Error fetching the file:", error.message);
+                      toast.error("Failed to open the file.");
+                    }
+                  }}
+                >
+                  {file.name}
+                </li>
+              ))}
+            </ul>
+
+              </div>
+            )}
             {activeChat.messages.map((msg, index) => (
-              <Message
-                key={index}
-                message={msg.text}
-                sender={msg.sender}
-              />
+              <Message key={index} message={msg.text} sender={msg.sender} />
             ))}
           </div>
         </div>

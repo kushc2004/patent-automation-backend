@@ -91,11 +91,7 @@ const client = async (prompt, history) => {
 };
 
 const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, activeChat }) => {
-    const initialHistory = [
-        { text: "Hello! I am Banthry AI, <br> Here to assist your legal queries. Please select 'For' or 'Against' for an opinion.", sender: 'model' }
-    ];
 
-    const [messages, setMessages] = useState(initialHistory);
     const [opinionDirection, setOpinionDirection] = useState(null);
     const [editMode, setEditMode] = useState(false);
     const [editContent, setEditContent] = useState('');
@@ -112,10 +108,51 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
     const [caseCategory, setCaseCategory] = useState('');
 
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [messages, setMessages] = useState([]);
+
+    
 
     const [uniqueIdentifier] = useState(
         sessionStorage.getItem("uniqueIdentifier") || "defaultUser"
       );
+
+      useEffect(() => {
+        const storedData = JSON.parse(sessionStorage.getItem("caseFormData")) || {};
+        setSessionData(storedData);
+    }, []);
+
+    let initialHistory = []
+
+    useEffect(() => {
+        if (Object.keys(sessionData).length > 0) {
+
+            const fileNames = sessionData.document
+                ? sessionData.document.map((file, index) => `<li>${file.name || `File ${index + 1}`}</li>`).join("")
+                : "No files uploaded.";
+
+            const formDataMessage = `
+                **
+                <b>Case Details:</b><br>
+                <b>Name:</b> ${sessionData.name || "Not provided"}<br>
+                <b>State:</b> ${sessionData.state || "Not provided"}<br>
+                <b>City:</b> ${sessionData.city || "Not provided"}<br>
+                <b>Category:</b> ${sessionData.category || "Not provided"}<br>
+                <b>Case State:</b> ${sessionData.caseState || "Not provided"}<br>
+                <b>Facts:</b> ${sessionData.facts || "Not provided"}<br>
+                <b>Uploaded Files:</b><br>
+                <ul>${fileNames}</ul>
+                **
+            `;
+
+            console.log("formDataMessage: ", formDataMessage);
+            initialHistory = [
+                { text: `Hello! I am Banthry AI, <br> Here to assist your legal queries. Please select 'For' or 'Against' for an opinion. <br><br>${formDataMessage}`, sender: 'model' }
+            ];
+            setMessages(initialHistory);
+        }
+    }, [sessionData]);
+
+    
 
     useEffect(() => {
         if (chatContainerRef.current) {
@@ -123,10 +160,7 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
         }
     }, [messages]);
 
-    useEffect(() => {
-        const storedData = JSON.parse(sessionStorage.getItem("caseFormData")) || {};
-        setSessionData(storedData);
-    }, []);
+    
 
     useEffect(() => {
         if (activeChat && activeChat.messages) {

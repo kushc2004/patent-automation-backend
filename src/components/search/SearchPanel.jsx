@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 
-const SearchPanel = ({ openCaseOverlay, isCaseOverlayOpen, setIsCaseOverlayOpen, setSelectedSearchCases, overlayContent, setSelectedOption }) => {
+const SearchPanel = ({ openCaseOverlay, isCaseOverlayOpen, setIsCaseOverlayOpen, setSelectedSearchCases, overlayContent, setSelectedOption, setMessages }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -120,6 +120,12 @@ const SearchPanel = ({ openCaseOverlay, isCaseOverlayOpen, setIsCaseOverlayOpen,
           console.error("Error fetching and filtering cases:", error);
         }
       }
+
+      setMessages((prevMessages) => [
+        ...prevMessages,
+        { text: `Search query: "${searchQuery}"`, sender: 'user' }
+    ]);
+
 
       const similarCases = await fetchAndFilterCases(formData);
 

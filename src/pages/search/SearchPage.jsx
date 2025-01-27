@@ -23,6 +23,7 @@ const ChatPage = () => {
     const [activeChat, setActiveChat] = useState(null); // { title, messages }
     const [selectedOption, setSelectedOption] = useState(null);
     const [selectedSearchCases, setSelectedSearchCases] = useState([]);
+    const [messages, setMessages] = useState([]);
     const navigate = useNavigate();
 
     const [uniqueIdentifier] = useState(
@@ -138,6 +139,7 @@ const ChatPage = () => {
                             setSelectedSearchCases={setSelectedSearchCases}
                             overlayContent={overlayContent}
                             setSelectedOption={setSelectedOption}
+                            setMessages={setMessages}
                         >
                             </SearchPanel>
                     </div>
@@ -151,6 +153,8 @@ const ChatPage = () => {
                         setActiveChat={setActiveChat}
                         activeChat={activeChat}
                         selectedSearchCases={selectedSearchCases}
+                        messages={messages}
+                        setMessages={setMessages}
                     />
 
                 {!selectedOption && (

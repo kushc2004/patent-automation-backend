@@ -270,8 +270,8 @@ const LoginPage = () => {
 
 
                 {/* Content Section */}
-                <div className="text-center p-8 bg-[#252525] rounded-lg shadow-lg max-w-md relative">
-                    <h2 className="text-2xl font-semibold mb-4 text-white">{slides[currentIndex].title}</h2>
+                <div className="text-center p-8 bg-gray-50 rounded-lg shadow-lg max-w-md relative">
+                    <h2 className="text-2xl font-semibold mb-4 text-gray-700">{slides[currentIndex].title}</h2>
                     
                     {/* Label for "Live Now" or "Coming Soon" */}
                     <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-2">
@@ -282,7 +282,7 @@ const LoginPage = () => {
                         )}
                     </div>
 
-                    <ul className="list-disc pl-5 space-y-2 text-gray-300 text-sm">
+                    <ul className="list-disc pl-5 space-y-2 text-gray-600 text-sm">
                         {slides[currentIndex].content.map((item, index) => (
                             <li className="ml-4 text-left" key={index}>{item}</li>
                         ))}
@@ -290,10 +290,10 @@ const LoginPage = () => {
                 </div>
 
                 {/* Carousel Controls */}
-                <button onClick={handlePrev} className="absolute left-4 text-gray-300 bg-[#252525] p-2 rounded-full shadow-md hover:bg-gray-500">
+                <button onClick={handlePrev} className="absolute left-4 text-gray-300 bg-gray-50 p-2 rounded-full shadow-md hover:bg-gray-500">
                     <ChevronLeftIcon className="w-8 h-8" />
                 </button>
-                <button onClick={handleNext} className="absolute right-4 text-gray-300 bg-[#252525] p-2 rounded-full shadow-md hover:bg-gray-500">
+                <button onClick={handleNext} className="absolute right-4 text-gray-300 bg-gray-50 p-2 rounded-full shadow-md hover:bg-gray-500">
                     <ChevronRightIcon className="w-8 h-8" />
                 </button>
             </section>
@@ -313,12 +313,12 @@ const LoginPage = () => {
                         </h1>
 
                         {/* Username Input */}
-                        <InputField
+                        {/* <InputField
                             label="Phone Number"
                             placeholder="Enter your Mobile Number"
                             value={username}
                             onChange={(e) => setUsername(e.target.value)}
-                        />
+                        /> */}
 
                         {/* Error Message */}
                         {error && <p className="text-red-500 mt-4 text-center">{error}</p>}
