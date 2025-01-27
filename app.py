@@ -110,7 +110,7 @@ async def automate_submission(user_data, session_id):
                 "- `type`: The type of the field (e.g., text, email, password, checkbox, radio, select, etc.).\n"
                 "- `selector`: A CSS selector to uniquely identify the field.\n"
                 "\n"
-                "Additionally, identify the submit button dynamically using its type, name, or text content.\n"
+                "Additionally, identify the submit button dynamically using its type, name, or text content.\n Also if any data is not provided in the input, then assume some temp data by yourslef. Ensure that all the fields are properly filled out so that the form will be submitted successfully.\n"
                 "\n"
                 "Return the output in a JSON format as shown below:\n"
                 "This is just for an example. Your response should be based on the actual form fields in the html page.\n"
