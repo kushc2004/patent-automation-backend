@@ -34,9 +34,8 @@ def submit():
     data = request.get_json()
     session_id = str(uuid.uuid4())
     # Start the automation in the background
-    asyncio.run_coroutine_threadsafe(automate_submission(data, session_id), asyncio.get_event_loop())
+    eventlet.spawn_n(eventlet.wrap_async(automate_submission), data, session_id)
     return jsonify({'session_id': session_id}), 200
-
 
 
 @socketio.on('join')
