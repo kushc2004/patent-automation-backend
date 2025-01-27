@@ -110,7 +110,7 @@ async def automate_submission(user_data, session_id):
                 f"HTML Content:\n{page_content}"
             )
             
-            print(f"Prompt for Gemini LLM for session {session_id}: {prompt}")
+            # print(f"Prompt for Gemini LLM for session {session_id}: {prompt}")
             
             lml_response = gemini_client(prompt)
             print(f"\n### LLM Response ###\n{lml_response}\n##\n")
