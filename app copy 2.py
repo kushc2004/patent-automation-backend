@@ -5,7 +5,7 @@ eventlet.monkey_patch()
 import os
 import uuid
 import asyncio
-import json
+import binascii
 import base64
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -36,7 +36,7 @@ print("Server started.")
 # Gemini LLM Client Function
 def gemini_client(prompt, file_paths = []):
     # gemini_api_key = os.getenv("GEMINI_API_KEY")
-    genai.configure(api_key="YOUR_GEMINI_API_KEY")  # Replace with your actual API key
+    genai.configure(api_key="AIzaSyBa2Boeqwb-nTZ_6IZxesRbawOBasBQr1E")
     model = genai.GenerativeModel(
         model_name="gemini-1.5-flash-latest",
         generation_config={
@@ -54,15 +54,24 @@ def gemini_client(prompt, file_paths = []):
         response = model.generate_content(prompt)
     return response.text
 
+# @app.route('/api/submit', methods=['POST'])
+# def submit():
+#     """Handles form submission requests."""
+#     data = request.get_json()
+#     session_id = str(uuid.uuid4())
+
+#     # Start the automation in the background
+#     socketio.start_background_task(automate_submission, data, session_id)
+#     return jsonify({'session_id': session_id}), 200
+
 @app.route('/api/submit', methods=['POST'])
 def submit():
     """Handles form submission requests."""
     data = request.get_json()
-    input_data = data.get('inputData', '')
     session_id = str(uuid.uuid4())
 
     # Start the automation in the background
-    eventlet.spawn_n(asyncio.run, automate_submission(input_data, session_id))
+    eventlet.spawn_n(asyncio.run, automate_submission(data, session_id))
     return jsonify({'session_id': session_id}), 200
 
 @socketio.on('join')
@@ -75,7 +84,7 @@ def on_join(data):
     else:
         print("Error: No session_id provided in join event.")
 
-async def automate_submission(input_data, session_id):
+async def automate_submission(user_data, session_id):
     """Performs the automation task for form submission."""
     try:
         print(f"Starting automation for session: {session_id}")
@@ -93,14 +102,18 @@ async def automate_submission(input_data, session_id):
             # Analyze the page to find input fields using Gemini LLM
             await emit_log(session_id, 'Analyzing form fields with Gemini LLM...')
             page_content = await page.content()
-
             prompt = (
-                "You are provided with the HTML content of a web form and user input data in arbitrary format. "
-                "Your task is to analyze the user input and map it to the form fields present in the HTML content. "
-                "Identify each form field's label, name, type, and CSS selector. Determine the appropriate value to fill "
-                "into each field based on the user input. If any required data is missing from the user input, "
-                "generate temporary placeholder data to ensure the form can be submitted successfully.\n\n"
-                "Provide the output in the following JSON format:\n"
+                "You are analyzing the HTML content of a web form. Your task is to identify all input fields and buttons, "
+                "and return them as a structured JSON. Each input field should include the following information: \n"
+                "- `label`: The label text or placeholder text for the input field.\n"
+                "- `name`: The name attribute of the field (if available).\n"
+                "- `type`: The type of the field (e.g., text, email, password, checkbox, radio, select, etc.).\n"
+                "- `selector`: A CSS selector to uniquely identify the field.\n"
+                "\n"
+                "Additionally, identify the submit button dynamically using its type, name, or text content.\n Also if any data is not provided in the input, then assume some temp data by yourslef. Ensure that all the fields are properly filled out so that the form will be submitted successfully.\n"
+                "\n"
+                "Return the output in a JSON format as shown below:\n"
+                "This is just for an example. Your response should be based on the actual form fields in the html page.\n"
                 "```json\n"
                 "{\n"
                 "  \"fields\": [\n"
@@ -108,26 +121,42 @@ async def automate_submission(input_data, session_id):
                 "      \"label\": \"Full Name\",\n"
                 "      \"name\": \"name\",\n"
                 "      \"type\": \"text\",\n"
-                "      \"selector\": \"#name\",\n"
-                "      \"value\": \"John Doe\"\n"
+                "      \"selector\": \"#name\"\n"
                 "    },\n"
                 "    {\n"
                 "      \"label\": \"Email Address\",\n"
                 "      \"name\": \"email\",\n"
                 "      \"type\": \"email\",\n"
-                "      \"selector\": \"#email\",\n"
-                "      \"value\": \"johndoe@example.com\"\n"
-                "    }\n"
-                "    // Add more fields as necessary\n"
+                "      \"selector\": \"#email\"\n"
+                "    },\n"
+                "    {\n"
+                "      \"label\": \"Subject\",\n"
+                "      \"name\": \"subject\",\n"
+                "      \"type\": \"text\",\n"
+                "      \"selector\": \"#subject\"\n"
+                "    },\n"
+                "    {\n"
+                "      \"label\": \"Body\",\n"
+                "      \"name\": \"body\",\n"
+                "      \"type\": \"text\",\n"
+                "      \"selector\": \"#body\"\n"
+                "    },\n"
+                "    {\n"
+                "      \"label\": \"First Name\",\n"
+                "      \"name\": \"name\",\n"
+                "      \"type\": \"text\",\n"
+                "      \"selector\": \"#fname\"\n"
+                "    },\n"
+                
                 "  ],\n"
                 "  \"submit_button\": {\n"
                 "    \"text\": \"Submit\",\n"
                 "    \"selector\": \"button[type='submit']\"\n"
                 "  }\n"
                 "}\n"
-                "```\n\n"
+                "```"
+                "\n"
                 "Ensure the JSON output is properly structured and parsable.\n\n"
-                f"User Input Data:\n{input_data}\n\n"
                 f"HTML Content:\n{page_content}"
             )
 
@@ -140,9 +169,6 @@ async def automate_submission(input_data, session_id):
                 await emit_log(session_id, 'Successfully extracted form fields and submit button.')
                 print(f"Form fields extracted for session {session_id}: {form_fields}")
                 print(f"Submit button: {submit_button}")
-
-                # Optionally, emit suggested fields to the frontend
-                socketio.emit('suggested-fields', {'fields': form_fields}, room=session_id)
             except json.JSONDecodeError:
                 await emit_log(session_id, 'Failed to parse Gemini LLM response.')
                 print(f"Error parsing Gemini response for session {session_id}: {lml_response}")
@@ -154,18 +180,16 @@ async def automate_submission(input_data, session_id):
                 field_name = field.get('name')
                 selector = field.get('selector')
                 field_type = field.get('type')
-                value = field.get('value', '')
-
-                if field_type in ['text', 'email', 'password', 'textarea']:
+                value = user_data.get(field_name, '')
+                if field_type == 'text' or field_type == 'email' or field_type == 'password':
                     await page.fill(selector, value)
-                elif field_type in ['radio', 'checkbox']:
-                    if value.lower() in ['true', 'yes', '1']:
+                elif field_type == 'radio' or field_type == 'checkbox':
+                    if value:
                         await page.check(selector)
                 elif field_type == 'select':
                     await page.select_option(selector, value)
                 # Add more field types as necessary
-
-                await take_screenshot(page, session_id, f"Filled '{field_name}' field with value '{value}'.")
+                await take_screenshot(page, session_id, f"Filled '{field_name}' field.")
 
             await emit_log(session_id, 'Form fields filled.')
             await take_screenshot(page, session_id, 'Form fields filled.')
@@ -179,8 +203,7 @@ async def automate_submission(input_data, session_id):
             # Wait for confirmation
             await emit_log(session_id, 'Waiting for confirmation...')
             try:
-                # Adjust the selector based on the actual confirmation element on the target page
-                await page.wait_for_selector('#confirmation', timeout=10000)
+                await page.wait_for_selector('#confirmation', timeout=10000)  # Adjust selector based on actual confirmation element
                 await emit_log(session_id, 'Form submitted successfully!')
                 await take_screenshot(page, session_id, 'Form submitted successfully.')
             except asyncio.TimeoutError:
@@ -194,6 +217,8 @@ async def automate_submission(input_data, session_id):
         if 'browser' in locals():
             await browser.close()
         print(f"Automation completed for session: {session_id}")
+
+
 
 async def emit_log(session_id, message):
     """Emits a log message to the session room."""
@@ -218,4 +243,5 @@ async def take_screenshot(page, session_id, step_description):
         await emit_log(session_id, f"Failed to take screenshot: {str(e)}")
 
 if __name__ == '__main__':
+    import json
     socketio.run(app, host='0.0.0.0', port=5000)
