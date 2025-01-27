@@ -36,9 +36,9 @@ print("Server started.")
 # Gemini LLM Client Function
 def gemini_client(prompt, file_paths = []):
     # gemini_api_key = os.getenv("GEMINI_API_KEY")
-    genai.configure(api_key="AIzaSyDzl9Xc6JWi0maEyGXiSy-K22-4GBw5w2c")
+    genai.configure(api_key="AIzaSyBa2Boeqwb-nTZ_6IZxesRbawOBasBQr1E")
     model = genai.GenerativeModel(
-        model_name="gemini-1.5-flash-002",
+        model_name="gemini-1.5-flash-latest",
         generation_config={
             "temperature": 0.2,
             "top_p": 0.95,
@@ -105,10 +105,12 @@ async def automate_submission(user_data, session_id):
             prompt = (
                 "Analyze the following HTML content of a form and identify all input fields with their corresponding labels and CSS selectors. "
                 "Provide the information in a JSON format with each field containing 'label', 'name', 'type', and 'selector'. "
+                "Add temp subject and body message for testing."
                 "Ensure the JSON is properly structured and parsable.\n\n"
                 f"HTML Content:\n{page_content}"
             )
             lml_response = gemini_client(prompt)
+            print(f"\n### LLM Response ###\n{lml_response}\n##\n")
             try:
                 form_fields = json.loads(lml_response)
                 await emit_log(session_id, 'Successfully extracted form fields.')
@@ -120,20 +122,20 @@ async def automate_submission(user_data, session_id):
 
             # Fill out the form based on extracted fields
             await emit_log(session_id, 'Filling out the form fields...')
-            for field in form_fields:
-                field_name = field.get('name')
-                selector = field.get('selector')
-                field_type = field.get('type')
-                value = user_data.get(field_name, '')
-                if field_type == 'text' or field_type == 'email' or field_type == 'password':
-                    await page.fill(selector, value)
-                elif field_type == 'radio' or field_type == 'checkbox':
-                    if value:
-                        await page.check(selector)
-                elif field_type == 'select':
-                    await page.select_option(selector, value)
-                # Add more field types as necessary
-                await take_screenshot(page, session_id, f"Filled '{field_name}' field.")
+            #for field in form_fields:
+            field_name = form_fields.get('name')
+            selector = form_fields.get('selector')
+            field_type = form_fields.get('type')
+            value = user_data.get(field_name, '')
+            if field_type == 'text' or field_type == 'email' or field_type == 'password':
+                await page.fill(selector, value)
+            elif field_type == 'radio' or field_type == 'checkbox':
+                if value:
+                    await page.check(selector)
+            elif field_type == 'select':
+                await page.select_option(selector, value)
+            # Add more field types as necessary
+            await take_screenshot(page, session_id, f"Filled '{field_name}' field.")
 
             await emit_log(session_id, 'Form fields filled.')
             await take_screenshot(page, session_id, 'Form fields filled.')
