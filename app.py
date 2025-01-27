@@ -36,7 +36,7 @@ print("Server started.")
 # Gemini LLM Client Function
 def gemini_client(prompt, file_paths = []):
     # gemini_api_key = os.getenv("GEMINI_API_KEY")
-    genai.configure(api_key="YOUR_GEMINI_API_KEY")  # Replace with your actual API key
+    genai.configure(api_key="AIzaSyBa2Boeqwb-nTZ_6IZxesRbawOBasBQr1E")  # Replace with your actual API key
     model = genai.GenerativeModel(
         model_name="gemini-1.5-flash-latest",
         generation_config={
