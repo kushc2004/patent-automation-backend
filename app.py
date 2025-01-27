@@ -1,6 +1,7 @@
 # app.py
 
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 from flask_socketio import SocketIO, join_room
 import eventlet
 import uuid
@@ -12,6 +13,12 @@ eventlet.monkey_patch()
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'Legal.ai*2024'  # Replace with a strong secret key
 socketio = SocketIO(app, async_mode='eventlet')
+# In app.py
+CORS(app, resources={r"/*": 
+    { 
+     "origins": ["http://localhost:3000", "https://legalai-frontend.onrender.com", "https://banthry.in", "https://www.banthry.in"]
+     }})
+
 
 @app.route('/api/submit', methods=['POST'])
 def submit():
