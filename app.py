@@ -93,10 +93,10 @@ async def emit_log(session_id, message):
 
 
 async def take_screenshot(page, session_id, step_description):
-    """Takes a screenshot and emits it to the session room."""
     try:
-        screenshot = await page.screenshot()
+        screenshot = await page.screenshot(full_page=False, quality=50)
         screenshot_base64 = base64.b64encode(screenshot).decode('utf-8')
+        print(f"Emitting screenshot for session {session_id}: {screenshot_base64[:50]}...")  # First 50 chars for verification
         socketio.emit('process-screenshot', {
             'description': step_description,
             'screenshot': screenshot_base64
