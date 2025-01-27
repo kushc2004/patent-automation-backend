@@ -103,21 +103,52 @@ async def automate_submission(user_data, session_id):
             await emit_log(session_id, 'Analyzing form fields with Gemini LLM...')
             page_content = await page.content()
             prompt = (
-                "Analyze the following HTML content of a form and identify all input fields with their corresponding labels and CSS selectors. "
-                "Provide the information in a JSON format with each field containing 'label', 'name', 'type', and 'selector'. "
-                "Add temp subject and body message for testing."
-                "Ensure the JSON is properly structured and parsable.\n\n"
+                "You are analyzing the HTML content of a web form. Your task is to identify all input fields and buttons, "
+                "and return them as a structured JSON. Each input field should include the following information: \n"
+                "- `label`: The label text or placeholder text for the input field.\n"
+                "- `name`: The name attribute of the field (if available).\n"
+                "- `type`: The type of the field (e.g., text, email, password, checkbox, radio, select, etc.).\n"
+                "- `selector`: A CSS selector to uniquely identify the field.\n"
+                "\n"
+                "Additionally, identify the submit button dynamically using its type, name, or text content.\n"
+                "\n"
+                "Return the output in a JSON format as shown below:\n"
+                "```json\n"
+                "{\n"
+                "  \"fields\": [\n"
+                "    {\n"
+                "      \"label\": \"Full Name\",\n"
+                "      \"name\": \"name\",\n"
+                "      \"type\": \"text\",\n"
+                "      \"selector\": \"#name\"\n"
+                "    },\n"
+                "    {\n"
+                "      \"label\": \"Email Address\",\n"
+                "      \"name\": \"email\",\n"
+                "      \"type\": \"email\",\n"
+                "      \"selector\": \"#email\"\n"
+                "    }\n"
+                "  ],\n"
+                "  \"submit_button\": {\n"
+                "    \"text\": \"Submit\",\n"
+                "    \"selector\": \"button[type='submit']\"\n"
+                "  }\n"
+                "}\n"
+                "```"
+                "\n"
+                "Ensure the JSON output is properly structured and parsable.\n\n"
                 f"HTML Content:\n{page_content}"
             )
-            
-            # print(f"Prompt for Gemini LLM for session {session_id}: {prompt}")
-            
+
             lml_response = gemini_client(prompt)
             print(f"\n### LLM Response ###\n{lml_response}\n##\n")
             try:
-                form_fields = json.loads(lml_response)
-                await emit_log(session_id, 'Successfully extracted form fields.')
+                form_data = json.loads(lml_response)
+                form_fields = form_data.get("fields", [])
+                submit_button = form_data.get("submit_button", {})
+                await emit_log(session_id, 'Successfully extracted form fields and submit button.')
                 print(f"Form fields extracted for session {session_id}: {form_fields}")
+                print(f"Submit button: {submit_button}")
             except json.JSONDecodeError:
                 await emit_log(session_id, 'Failed to parse Gemini LLM response.')
                 print(f"Error parsing Gemini response for session {session_id}: {lml_response}")
@@ -145,7 +176,7 @@ async def automate_submission(user_data, session_id):
 
             # Submit the form
             await emit_log(session_id, 'Submitting the form...')
-            submit_selector = '#submit-button'  # Adjust based on actual submit button selector
+            submit_selector = submit_button.get("selector", "button[type='submit']")  # Default selector
             await page.click(submit_selector)
             await take_screenshot(page, session_id, 'Clicked submit button.')
 
@@ -166,6 +197,8 @@ async def automate_submission(user_data, session_id):
         if 'browser' in locals():
             await browser.close()
         print(f"Automation completed for session: {session_id}")
+
+
 
 async def emit_log(session_id, message):
     """Emits a log message to the session room."""
