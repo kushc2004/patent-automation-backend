@@ -1,5 +1,7 @@
 # app.py
-
+import eventlet
+eventlet.monkey_patch()
+    
 import os
 import uuid
 import asyncio
@@ -137,6 +139,4 @@ async def emit_log(session_id, message):
     socketio.emit('process-log', {'message': message}, room=session_id)
 
 if __name__ == '__main__':
-    import eventlet
-    eventlet.monkey_patch()
     socketio.run(app, host='0.0.0.0', port=5000)
