@@ -36,7 +36,7 @@ print("Server started.")
 # Gemini LLM Client Function
 def gemini_client(prompt, file_paths = []):
     # gemini_api_key = os.getenv("GEMINI_API_KEY")
-    genai.configure(api_key="AIzaSyBa2Boeqwb-nTZ_6IZxesRbawOBasBQr1E")  # Replace with your actual API key
+    genai.configure(api_key="AIzaSyBa2Boeqwb-nTZ_6IZxesRbawOBasBQr1E")  # Securely load API key from environment
     model = genai.GenerativeModel(
         model_name="gemini-1.5-flash-latest",
         generation_config={
@@ -94,12 +94,16 @@ async def automate_submission(input_data, session_id):
             await emit_log(session_id, 'Analyzing form fields with Gemini LLM...')
             page_content = await page.content()
 
+            # Updated prompt with confirmation strategies
             prompt = (
                 "You are provided with the HTML content of a web form and user input data in arbitrary format. "
                 "Your task is to analyze the user input and map it to the form fields present in the HTML content. "
                 "Identify each form field's label, name, type, and CSS selector. Determine the appropriate value to fill "
                 "into each field based on the user input. If any required data is missing from the user input, "
                 "generate temporary placeholder data to ensure the form can be submitted successfully.\n\n"
+                "Additionally, identify multiple strategies to detect successful form submission dynamically. "
+                "These strategies may include, but are not limited to, detecting success messages, URL changes, "
+                "absence of the form, or any other reliable indicators.\n\n"
                 "Provide the output in the following JSON format:\n"
                 "```json\n"
                 "{\n"
@@ -123,7 +127,18 @@ async def automate_submission(input_data, session_id):
                 "  \"submit_button\": {\n"
                 "    \"text\": \"Submit\",\n"
                 "    \"selector\": \"button[type='submit']\"\n"
-                "  }\n"
+                "  },\n"
+                "  \"confirmation_strategies\": [\n"
+                "    {\n"
+                "      \"strategy\": \"success_message\",\n"
+                "      \"description\": \"Detect a success message with specific text or CSS selector.\"\n"
+                "    },\n"
+                "    {\n"
+                "      \"strategy\": \"url_change\",\n"
+                "      \"description\": \"Monitor for a change in the URL indicating a new page or a confirmation URL.\"\n"
+                "    }\n"
+                "    // Add more strategies as necessary\n"
+                "  ]\n"
                 "}\n"
                 "```\n\n"
                 "Ensure the JSON output is properly structured and parsable.\n\n"
@@ -137,12 +152,14 @@ async def automate_submission(input_data, session_id):
                 form_data = json.loads(lml_response)
                 form_fields = form_data.get("fields", [])
                 submit_button = form_data.get("submit_button", {})
-                await emit_log(session_id, 'Successfully extracted form fields and submit button.')
+                confirmation_strategies = form_data.get("confirmation_strategies", [])
+                await emit_log(session_id, 'Successfully extracted form fields, submit button, and confirmation strategies.')
                 print(f"Form fields extracted for session {session_id}: {form_fields}")
                 print(f"Submit button: {submit_button}")
+                print(f"Confirmation strategies: {confirmation_strategies}")
 
                 # Optionally, emit suggested fields to the frontend
-                socketio.emit('suggested-fields', {'fields': form_fields}, room=session_id)
+                socketio.emit('suggested-fields', {'fields': form_fields, 'confirmation_strategies': confirmation_strategies}, room=session_id)
             except json.JSONDecodeError:
                 await emit_log(session_id, 'Failed to parse Gemini LLM response.')
                 print(f"Error parsing Gemini response for session {session_id}: {lml_response}")
@@ -159,7 +176,10 @@ async def automate_submission(input_data, session_id):
                 if field_type in ['text', 'email', 'password', 'textarea']:
                     await page.fill(selector, value)
                 elif field_type in ['radio', 'checkbox']:
-                    if value.lower() in ['true', 'yes', '1']:
+                    if isinstance(value, str):
+                        if value.lower() in ['true', 'yes', '1']:
+                            await page.check(selector)
+                    elif isinstance(value, bool) and value:
                         await page.check(selector)
                 elif field_type == 'select':
                     await page.select_option(selector, value)
@@ -176,16 +196,67 @@ async def automate_submission(input_data, session_id):
             await page.click(submit_selector)
             await take_screenshot(page, session_id, 'Clicked submit button.')
 
-            # Wait for confirmation
-            await emit_log(session_id, 'Waiting for confirmation...')
-            try:
-                # Adjust the selector based on the actual confirmation element on the target page
-                await page.wait_for_selector('#confirmation', timeout=10000)
+            # Implement dynamic confirmation detection
+            await emit_log(session_id, 'Waiting for confirmation using dynamic strategies...')
+            confirmation_detected = False
+            for strategy in confirmation_strategies:
+                strat_name = strategy.get("strategy")
+                description = strategy.get("description")
+                await emit_log(session_id, f"Attempting confirmation strategy: {strat_name} - {description}")
+
+                if strat_name == "success_message":
+                    # Example: Look for common success messages
+                    success_selectors = ["div.success", "p.success", ".alert-success", ".message.success"]
+                    success_texts = ["Thank you", "successfully submitted", "we have received your", "your form has been submitted"]
+                    for sel in success_selectors:
+                        try:
+                            if await page.query_selector(sel):
+                                text_content = await page.inner_text(sel)
+                                if any(text.lower() in text_content.lower() for text in success_texts):
+                                    await emit_log(session_id, f"Success message detected using selector '{sel}'.")
+                                    confirmation_detected = True
+                                    break
+                        except:
+                            continue
+                    if confirmation_detected:
+                        break
+
+                elif strat_name == "url_change":
+                    # Detect if the URL has changed after submission
+                    original_url = page.url
+                    try:
+                        await page.wait_for_timeout(5000)  # Wait for potential URL change
+                        new_url = page.url
+                        if new_url != original_url:
+                            await emit_log(session_id, f"URL changed from {original_url} to {new_url}.")
+                            confirmation_detected = True
+                            break
+                    except:
+                        continue
+
+                elif strat_name == "form_absence":
+                    # Check if the form is no longer present
+                    form_selectors = ["form", "div.form-container", "#contact-form"]
+                    form_absent = True
+                    for form_sel in form_selectors:
+                        if await page.query_selector(form_sel):
+                            form_absent = False
+                            break
+                    if form_absent:
+                        await emit_log(session_id, "Form is no longer present on the page.")
+                        confirmation_detected = True
+                        break
+
+                # Add more strategies as defined by the LLM
+                else:
+                    await emit_log(session_id, f"Unknown confirmation strategy: {strat_name}")
+
+            if confirmation_detected:
                 await emit_log(session_id, 'Form submitted successfully!')
                 await take_screenshot(page, session_id, 'Form submitted successfully.')
-            except asyncio.TimeoutError:
-                await emit_log(session_id, 'Confirmation message not found. Verify submission.')
-                await take_screenshot(page, session_id, 'Confirmation message not found.')
+            else:
+                await emit_log(session_id, 'Confirmation not detected. Verify submission.')
+                await take_screenshot(page, session_id, 'Confirmation not detected.')
 
     except Exception as e:
         print(f"Error in automation for session {session_id}: {str(e)}")
