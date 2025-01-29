@@ -10,6 +10,8 @@ from flask_cors import CORS
 from flask_socketio import SocketIO, join_room
 from dotenv import load_dotenv
 from agents.automate_submission_agent import AutomateSubmissionAgent  # Import the new agent class
+from typing import Dict, Any, List
+
 
 # Load environment variables from .env
 load_dotenv()
