@@ -4,12 +4,13 @@ eventlet.monkey_patch()
 
 import os
 import uuid
+import asyncio
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from flask_socketio import SocketIO, join_room
 from dotenv import load_dotenv
-from agents import AutomateSubmissionAgent
-from typing import Dict, Any
+from agents import AutomateSubmissionAgent  # Import the new agent class
+from typing import Dict, Any, List
 
 # Load environment variables from .env
 load_dotenv()
@@ -33,6 +34,7 @@ print("Server started.")
 # Dictionary to keep track of agents by session_id
 agents_dict: Dict[str, AutomateSubmissionAgent] = {}
 
+
 @app.route('/api/submit', methods=['POST'])
 def submit():
     """Handles form submission requests."""
@@ -41,14 +43,12 @@ def submit():
     form_requirements = data.get('formRequirements', 'contact forms')  # Get form search requirements
     session_id = str(uuid.uuid4())
 
-    # Create AutomateSubmissionAgent
+    # Instantiate the agent and start the automation in the background
     agent = AutomateSubmissionAgent(socketio, session_id, input_data, form_requirements)
     agents_dict[session_id] = agent
-
-    # Start the automation process in a separate green thread
-    eventlet.spawn_n(agent.automate_submission)
-
+    eventlet.spawn_n(asyncio.run, agent.automate_submission())
     return jsonify({'session_id': session_id}), 200
+
 
 @socketio.on('join')
 def on_join(data):
@@ -59,6 +59,7 @@ def on_join(data):
         print(f"Client joined room: {session_id}")
     else:
         print("Error: No session_id provided in join event.")
+
 
 @socketio.on('user-input')
 def handle_user_input_event(data):
@@ -71,6 +72,7 @@ def handle_user_input_event(data):
         agent.receive_user_input(user_input)
     else:
         print(f"No agent found for session_id: {session_id}")
+
 
 if __name__ == '__main__':
     socketio.run(app, host='0.0.0.0', port=5000)
