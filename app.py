@@ -30,17 +30,24 @@ socketio = SocketIO(app, async_mode='eventlet', cors_allowed_origins="*")
 
 print("Server started.")
 
+# Dictionary to keep track of agents by session_id
+agents_dict: Dict[str, AutomateSubmissionAgent] = {}
+
+
 @app.route('/api/submit', methods=['POST'])
 def submit():
     """Handles form submission requests."""
     data = request.get_json()
-    input_data = data.get('inputData', '')
+    input_data = data.get('inputData', {})
+    form_requirements = data.get('formRequirements', 'contact forms')  # Get form search requirements
     session_id = str(uuid.uuid4())
 
     # Instantiate the agent and start the automation in the background
-    agent = AutomateSubmissionAgent(socketio, session_id, input_data)
+    agent = AutomateSubmissionAgent(socketio, session_id, input_data, form_requirements)
+    agents_dict[session_id] = agent
     eventlet.spawn_n(asyncio.run, agent.automate_submission())
     return jsonify({'session_id': session_id}), 200
+
 
 @socketio.on('join')
 def on_join(data):
@@ -51,6 +58,20 @@ def on_join(data):
         print(f"Client joined room: {session_id}")
     else:
         print("Error: No session_id provided in join event.")
+
+
+@socketio.on('user-input')
+def handle_user_input_event(data):
+    """Handles user input sent from the frontend."""
+    session_id = data.get('session_id')
+    user_input = data.get('input')  # This should be a dictionary containing the required data
+
+    if session_id in agents_dict:
+        agent = agents_dict[session_id]
+        agent.receive_user_input(user_input)
+    else:
+        print(f"No agent found for session_id: {session_id}")
+
 
 if __name__ == '__main__':
     socketio.run(app, host='0.0.0.0', port=5000)
