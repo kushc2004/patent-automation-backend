@@ -9,7 +9,6 @@ import google.generativeai as genai
 from flask_socketio import SocketIO
 from typing import Dict, Any, List
 import threading
-import time
 
 class AutomateSubmissionAgent:
     def __init__(self, socketio: SocketIO, session_id: str, input_data: Dict[str, Any], form_requirements: str):
@@ -22,6 +21,9 @@ class AutomateSubmissionAgent:
         self.browser = None
         self.playwright = None
         self.lock = threading.Lock()
+        self.screenshot_thread = None
+        self.user_input_event = eventlet.event.Event()
+        self.user_input = None
 
     def configure_genai(self):
         genai.configure(api_key="AIzaSyBa2Boeqwb-nTZ_6IZxesRbawOBasBQr1E")  # Replace with your actual API key
@@ -57,18 +59,17 @@ class AutomateSubmissionAgent:
     def screenshot_loop(self):
         """Continuously takes screenshots at 30fps."""
         while self.streaming:
-            with self.lock:
-                if self.page:
-                    try:
-                        screenshot_bytes = self.page.screenshot()
-                        screenshot_b64 = base64.b64encode(screenshot_bytes).decode('utf-8')
-                        self.socketio.emit('process-screenshot', {
-                            'description': 'Continuous Screenshot',
-                            'screenshot': screenshot_b64
-                        }, room=self.session_id)
-                    except Exception as e:
-                        self.emit_log(f"Failed to take continuous screenshot: {str(e)}")
-            time.sleep(1/30)  # 30fps
+            if self.page:
+                try:
+                    screenshot_bytes = self.page.screenshot()
+                    screenshot_b64 = base64.b64encode(screenshot_bytes).decode('utf-8')
+                    self.socketio.emit('process-screenshot', {
+                        'description': 'Continuous Screenshot',
+                        'screenshot': screenshot_b64
+                    }, room=self.session_id)
+                except Exception as e:
+                    self.emit_log(f"Failed to take continuous screenshot: {str(e)}")
+            eventlet.sleep(1/30)  # Use eventlet's sleep to avoid blocking
 
     def gemini_client(self, prompt: str, file_paths: List[str] = []) -> str:
         """Generates content using Gemini LLM."""
@@ -83,29 +84,15 @@ class AutomateSubmissionAgent:
         """Prompts the user for input and waits for the response."""
         self.socketio.emit('request-user-input', {'prompt': prompt}, room=self.session_id)
         self.emit_log("Awaiting user input...")
-        # Since eventlet is being used, we'll use eventlet's synchronization primitives
-        # We'll use a threading.Event to wait for input
-        self.user_input = None
-        event = eventlet.event.Event()
-
-        def wait_for_input(data):
-            self.user_input = data
-            event.send()
-
-        self.socketio.on('user-input', wait_for_input)
-
-        event.wait()
-
-        # Remove the handler after receiving input
-        self.socketio.off('user-input', wait_for_input)
-
+        # Wait for the user input event to be set by the socket handler
+        self.user_input_event.wait()
         return self.user_input
 
     def handle_user_input(self, data: Any):
         """Handles the user input received from the frontend."""
-        # This method will be called from the socket event
-        if hasattr(self, 'user_input_event'):
-            self.user_input_event.send(data)
+        if not self.user_input_event.ready():
+            self.user_input = data
+            self.user_input_event.send()
 
     def automate_submission(self):
         """Performs the automation task for form submission."""
@@ -113,6 +100,15 @@ class AutomateSubmissionAgent:
             self.emit_log('Starting automation process.')
             self.configure_genai()
 
+            # Start Playwright in a separate thread to avoid Eventlet interference
+            threading.Thread(target=self.run_playwright, daemon=True).start()
+
+        except Exception as e:
+            self.emit_log(f"Error occurred during automation initialization: {str(e)}")
+
+    def run_playwright(self):
+        """Runs Playwright operations."""
+        try:
             # Start Playwright
             self.playwright = sync_playwright().start()
             self.browser = self.playwright.chromium.launch(headless=True)  # Set headless=False to see the browser actions
@@ -121,21 +117,21 @@ class AutomateSubmissionAgent:
 
             self.emit_log('Launching browser...')
             self.take_screenshot('Launching browser.')
-            time.sleep(1)  # Delay for visibility
+            eventlet.sleep(1)  # Use eventlet's sleep
 
             # Step 1: Open Google and search for forms
             self.emit_log('Navigating to Google...')
             search_query = self.form_requirements
             self.page.goto(f'https://www.google.com/search?q={search_query}&sourceid=chrome&ie=UTF-8')
             self.take_screenshot('Navigated to Google.')
-            time.sleep(1)  # Delay for visibility
+            eventlet.sleep(1)  # Delay for visibility
 
             # # Enter search query and perform search
             # self.page.fill('input[name="q"]', search_query)
             # self.page.keyboard.press('Enter')
-            # time.sleep(2)  # Delay for search results to load
+            # eventlet.sleep(2)  # Delay for search results to load
             # self.take_screenshot(f'Searching for forms: {search_query}')
-            # time.sleep(1)
+            # eventlet.sleep(1)
 
             # # Click on the first search result
             # first_result_selector = 'h3'
@@ -143,38 +139,17 @@ class AutomateSubmissionAgent:
             # first_result = self.page.query_selector(first_result_selector)
             # if first_result:
             #     first_result.click()
-            #     time.sleep(3)  # Delay to allow the page to load
+            #     eventlet.sleep(3)  # Delay to allow the page to load
             #     self.take_screenshot('Opened the first search result.')
             # else:
             #     self.emit_log('No search results found.')
             #     return
-                # Enter search query
-                # search_query = self.form_requirements
-                # await self.emit_log(f'Searching for forms: {search_query}')
-                # await page.fill('input[name="q"]', search_query)
-                # await page.keyboard.press('Enter')
-                # await asyncio.sleep(2)  # Delay for search results to load
-                # await self.take_screenshot(page, f'Searching for forms: {search_query}')
-                # await asyncio.sleep(1)
-
-                # # Click on the first search result
-                # first_result_selector = 'h3'
-                # await self.emit_log('Opening the first search result...')
-                # first_result = await page.query_selector(first_result_selector)
-                # if first_result:
-                #     await first_result.click()
-                #     await asyncio.sleep(3)  # Delay to allow the page to load
-                #     await self.take_screenshot(page, 'Opened the first search result.')
-                # else:
-                #     await self.emit_log('No search results found.')
-                #     return
-
-                
-            self.page.goto('https://fluentforms.com/forms/contact-form-demo/')
             
+            self.page.goto('https://fluentforms.com/forms/contact-form-demo/')
+
             # Start the screenshot loop
             self.streaming = True
-            eventlet.spawn_n(self.screenshot_loop)
+            self.screenshot_thread = eventlet.spawn_n(self.screenshot_loop)
 
             # Analyze the form fields using Gemini LLM
             self.emit_log('Analyzing form fields with Gemini LLM...')
@@ -293,18 +268,18 @@ class AutomateSubmissionAgent:
                 # Add more field types as necessary
 
                 self.take_screenshot(f"Filled '{field_name}' field with value '{value}'.")
-                time.sleep(0.5)  # Delay for visibility
+                eventlet.sleep(0.5)  # Use eventlet's sleep
 
             self.emit_log('Form fields filled.')
             self.take_screenshot('Form fields filled.')
-            time.sleep(1)
+            eventlet.sleep(1)
 
             # Submit the form
             self.emit_log('Submitting the form...')
             submit_selector = submit_button.get("selector", "button[type='submit']")
             self.page.click(submit_selector)
             self.take_screenshot('Clicked submit button.')
-            time.sleep(2)
+            eventlet.sleep(2)
 
             # Implement dynamic confirmation detection
             self.emit_log('Waiting for confirmation using dynamic strategies...')
@@ -336,7 +311,7 @@ class AutomateSubmissionAgent:
                 elif strat_name == "url_change":
                     original_url = self.page.url
                     try:
-                        time.sleep(5)  # Wait for potential URL change
+                        eventlet.sleep(5)  # Wait for potential URL change
                         new_url = self.page.url
                         if new_url != original_url:
                             self.emit_log(f"URL changed from {original_url} to {new_url}.")
@@ -380,6 +355,5 @@ class AutomateSubmissionAgent:
     def receive_user_input(self, data: Any):
         """Receives user input from the frontend and sets the future result."""
         # This method will be called from the socket event
-        if self.user_input is None:
-            self.user_input = data
-            self.socketio.emit('user-input', data, room=self.session_id)
+        self.user_input = data
+        self.user_input_event.send()
