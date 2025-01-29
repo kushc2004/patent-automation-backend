@@ -408,9 +408,9 @@ class AutomateSubmissionAgent:
             
             # Type character by character with random delays
             for char in text:
-                await page.keyboard.type(char, delay=random.uniform(50, 150))
+                await page.keyboard.type(char, delay=50)
                 # Take screenshot every 3 characters for typing effect
-                if len(text) > 3 and random.random() < 0.3:
+                if len(text) > 3:
                     await self.take_screenshot(page, "Typing in progress")
         except Exception as e:
             await self.emit_log(f"Error during typing: {str(e)}")
