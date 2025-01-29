@@ -98,7 +98,7 @@ class AutomateSubmissionAgent:
             self.streaming_task = asyncio.create_task(self.stream_screenshots())
 
             async with async_playwright() as p:
-                browser = await p.chromium.launch(headless=False)  # Set headless=False to see the browser actions
+                browser = await p.chromium.launch(headless=True)  # Set headless=False to see the browser actions
                 context = await browser.new_context()
                 page = await context.new_page()
 
