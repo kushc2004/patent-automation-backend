@@ -6,6 +6,7 @@ from playwright.async_api import async_playwright, Page
 import google.generativeai as genai
 from flask_socketio import SocketIO
 from typing import Dict, Any, List
+import random
 
 class AutomateSubmissionAgent:
     def __init__(self, socketio: SocketIO, session_id: str, input_data: Dict[str, Any], form_requirements: str):
@@ -262,16 +263,22 @@ class AutomateSubmissionAgent:
                             value = file_path  # Path to the file
 
                     if field_type in ['text', 'email', 'password', 'textarea']:
-                        await page.fill(selector, value)
+                        
+                        #await page.fill(selector, value)
+                        await self._smooth_scroll_to_element(page, selector)
+                        await self._type_with_effect(page, selector, value)
                     elif field_type in ['radio', 'checkbox']:
+                        await self._smooth_scroll_to_element(page, selector)
                         if isinstance(value, str):
                             if value.lower() in ['true', 'yes', '1']:
                                 await page.check(selector)
                         elif isinstance(value, bool) and value:
                             await page.check(selector)
                     elif field_type == 'select':
+                        await self._smooth_scroll_to_element(page, selector)
                         await page.select_option(selector, value)
                     elif field_type == 'file':
+                        await self._smooth_scroll_to_element(page, selector)
                         await page.set_input_files(selector, value)  # 'value' should be the file path
                     # Add more field types as necessary
 
@@ -370,6 +377,44 @@ class AutomateSubmissionAgent:
                     pass
             # Optionally, send all buffered screenshots as a video
             await self.send_complete_video()
+            
+    async def _smooth_scroll_to_element(self, page: Page, selector: str):
+        """Smoothly scrolls to the specified element."""
+        try:
+            await page.evaluate(f"""async (selector) => {{
+                const element = document.querySelector(selector);
+                if (element) {{
+                    element.scrollIntoView({{
+                        behavior: 'smooth',
+                        block: 'center',
+                        inline: 'center'
+                    }});
+                    // Add smooth transition for better visual effect
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                }}
+            }}""", selector)
+            await asyncio.sleep(0.3)  # Allow time for scrolling animation
+        except Exception as e:
+            await self.emit_log(f"Error during scrolling: {str(e)}")
+
+    async def _type_with_effect(self, page: Page, selector: str, text: str):
+        """Simulates human-like typing with random delays."""
+        try:
+            await page.click(selector)  # Focus the field
+            await page.evaluate(f"""() => {{
+                const element = document.querySelector('{selector}');
+                if (element) element.value = '';
+            }}""")  # Clear field using JavaScript
+            
+            # Type character by character with random delays
+            for char in text:
+                await page.keyboard.type(char, delay=random.uniform(50, 150))
+                # Take screenshot every 3 characters for typing effect
+                if len(text) > 3 and random.random() < 0.3:
+                    await self.take_screenshot(page, "Typing in progress")
+        except Exception as e:
+            await self.emit_log(f"Error during typing: {str(e)}")
+            await page.fill(selector, text)  # Fallback to normal fill
 
     async def send_complete_video(self):
         """Sends all buffered screenshots as a video after completion."""
