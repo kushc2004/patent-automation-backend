@@ -42,16 +42,14 @@ def submit():
     """Handles form submission requests."""
     data = request.get_json()
     input_data = data.get('inputData', {})
-    form_requirements = data.get('formRequirements', 'contact forms')  # Get form search requirements
+    form_requirements = data.get('formRequirements', 'contact forms')  
     session_id = str(uuid.uuid4())
 
-    # Create VideoStreamingAgent
+    # Create agents
     video_agent = VideoStreamingAgent(socketio, session_id)
-
-    # Create UserInputAgent
     user_input_agent = UserInputAgent(socketio, session_id)
 
-    # Store agents in the dictionary
+    # Store agents in a dictionary
     agents_dict[session_id] = {
         'video_agent': video_agent,
         'user_input_agent': user_input_agent,
@@ -62,10 +60,12 @@ def submit():
     # Start video streaming
     video_agent.start_streaming()
 
-    # Start automation in the background
-    eventlet.spawn_n(asyncio.run, automate_process(session_id, input_data, form_requirements))
+    # Start automation process using eventlet.spawn_n() instead of asyncio.run()
+    eventlet.spawn_n(automate_process, session_id, input_data, form_requirements)
 
     return jsonify({'session_id': session_id}), 200
+
+
 
 async def automate_process(session_id: str, input_data: Dict[str, Any], form_requirements: str):
     """Coordinates the automation process using different agents."""
@@ -82,7 +82,7 @@ async def automate_process(session_id: str, input_data: Dict[str, Any], form_req
     agents_dict[session_id]['search_agent'] = search_agent
 
     # Perform search
-    first_result_url = await search_agent.perform_search()
+    first_result_url = eventlet.with_timeout(30, search_agent.perform_search())
     if not first_result_url:
         await video_agent.socketio.emit('process-log', {'message': 'No search result to proceed.'}, room=session_id)
         video_agent.stop_streaming()
@@ -90,7 +90,7 @@ async def automate_process(session_id: str, input_data: Dict[str, Any], form_req
 
     # Navigate to the first result
     await video_agent.socketio.emit('process-log', {'message': f'Navigating to {first_result_url}'}, room=session_id)
-    await asyncio.sleep(3)  # Delay for visibility
+    await eventlet.sleep(3)  # Delay for visibility
 
     # Continue with Playwright navigation
     # Reuse the existing Playwright instance from SearchAgent
@@ -103,7 +103,7 @@ async def automate_process(session_id: str, input_data: Dict[str, Any], form_req
     # Gemini LLM Client Function
     def gemini_client(prompt, file_paths = []):
         # gemini_api_key = os.getenv("GEMINI_API_KEY")
-        genai.configure(api_key=os.getenv("GEMINI_API_KEY"))  # Securely load API key from environment
+        genai.configure(api_key=os.getenv("AIzaSyBa2Boeqwb-nTZ_6IZxesRbawOBasBQr1E"))  # Securely load API key from environment
         model = genai.GenerativeModel(
             model_name="gemini-1.5-flash-latest",
             generation_config={
@@ -201,11 +201,13 @@ async def automate_process(session_id: str, input_data: Dict[str, Any], form_req
         return
 
     # Start filling the form
-    await form_filling_agent.fill_form(page, input_data)
+    eventlet.spawn_n(form_filling_agent.fill_form, search_agent.page, input_data)
 
     # Submit the form
-    await form_filling_agent.submit_form(page)
+    eventlet.spawn_n(form_filling_agent.submit_form, search_agent.page)
 
+    # Cleanup
+    eventlet.sleep(5)
     # Close all agents
     await search_agent.close_browser()
     video_agent.stop_streaming()

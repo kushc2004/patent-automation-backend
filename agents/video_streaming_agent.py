@@ -1,53 +1,36 @@
-# agents/video_streaming_agent.py
-import asyncio
-import base64
-from flask_socketio import SocketIO
-from playwright.async_api import Page
-from typing import List, Dict
+# Modify start_streaming() to use eventlet.spawn_n()
+import eventlet
 
 class VideoStreamingAgent:
-    def __init__(self, socketio: SocketIO, session_id: str):
+    def __init__(self, socketio, session_id):
         self.socketio = socketio
         self.session_id = session_id
-        self.screenshot_buffer: List[Dict[str, str]] = []
-        self.buffer_lock = asyncio.Lock()
-        self.streaming_task: asyncio.Task = None
+        self.screenshot_buffer = []
+        self.buffer_lock = eventlet.semaphore.Semaphore()
+        self.streaming_task = None
 
-    async def take_screenshot(self, page: Page, step_description: str):
-        """Takes a screenshot and adds it to the buffer."""
-        try:
-            screenshot_bytes = await page.screenshot()
-            screenshot_b64 = base64.b64encode(screenshot_bytes).decode('utf-8')
-            async with self.buffer_lock:
-                self.screenshot_buffer.append({
-                    'description': step_description,
-                    'screenshot': screenshot_b64
-                })
-        except Exception as e:
-            print(f"Error taking screenshot: {e}")
+    def start_streaming(self):
+        """Starts the screenshot streaming task using eventlet."""
+        self.streaming_task = eventlet.spawn_n(self.stream_screenshots)
 
-    async def stream_screenshots(self):
-        """Streams screenshots from the buffer at ~30fps."""
+    def stop_streaming(self):
+        """Stops the streaming task."""
+        if self.streaming_task:
+            eventlet.kill(self.streaming_task)
+            self.streaming_task = None
+
+    def stream_screenshots(self):
+        """Streams screenshots using eventlet at ~30fps."""
         try:
             while True:
-                async with self.buffer_lock:
+                with self.buffer_lock:
                     if self.screenshot_buffer:
                         screenshot = self.screenshot_buffer.pop(0)
                         self.socketio.emit('process-screenshot', screenshot, room=self.session_id)
-                await asyncio.sleep(1/30)  # 30fps
-        except asyncio.CancelledError:
-            # Send any remaining screenshots
-            async with self.buffer_lock:
+                eventlet.sleep(1/30)  # 30fps
+        except eventlet.greenlet.GreenletExit:
+            # Send remaining screenshots before exiting
+            with self.buffer_lock:
                 for screenshot in self.screenshot_buffer:
                     self.socketio.emit('process-screenshot', screenshot, room=self.session_id)
                 self.screenshot_buffer.clear()
-            raise
-
-    def start_streaming(self):
-        """Starts the screenshot streaming task."""
-        self.streaming_task = asyncio.create_task(self.stream_screenshots())
-
-    def stop_streaming(self):
-        """Stops the screenshot streaming task."""
-        if self.streaming_task:
-            self.streaming_task.cancel()
