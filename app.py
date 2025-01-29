@@ -1,7 +1,6 @@
 # app.py
 import eventlet
-# Prevent Eventlet from monkey patching 'select'
-eventlet.monkey_patch(select=False)
+eventlet.monkey_patch(select=False)  # Prevent Eventlet from monkey patching 'select'
 
 import os
 import uuid

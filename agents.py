@@ -119,41 +119,17 @@ class AutomateSubmissionAgent:
             self.take_screenshot('Launching browser.')
             eventlet.sleep(1)  # Use eventlet's sleep
 
-            # Step 1: Open Google and search for forms
-            self.emit_log('Navigating to Google...')
-            search_query = self.form_requirements
-            self.emit_log('Navigating to Google...')
-            search_query = self.form_requirements
-
-            # Open Google and search
-            # self.page.goto(f'https://www.google.com/search?q={search_query}&sourceid=chrome&ie=UTF-8')
-            # self.page.wait_for_load_state('networkidle')  # Ensure page is fully loaded
-            # self.take_screenshot('Navigated to Google.')
-            #eventlet.sleep(1)
-
-            # Enter search query and perform search
-            # search_box_selector = 'input[name="q"]'
-            # self.page.wait_for_selector(search_box_selector, timeout=5000)
-            # self.page.fill(search_box_selector, search_query)
-            # self.page.keyboard.press('Enter')
-            # self.page.wait_for_load_state('networkidle')
-            # self.take_screenshot(f'Searching for forms: {search_query}')
-            # eventlet.sleep(1)
-
-            # Instead of clicking search results, manually go to the Fluent Forms page
+            # Step 1: Navigate to the contact form demo directly
             self.emit_log('Skipping search results and navigating to the contact form demo...')
             self.page.goto('https://fluentforms.com/forms/contact-form-demo/')
             self.page.wait_for_load_state('networkidle')
             self.take_screenshot('Manually navigated to contact form demo.')
+            self.emit_log('Navigated to contact form demo.')
 
-            # Start the screenshot loop properly
-            self.streaming = True
-            self.screenshot_thread = eventlet.spawn(self.screenshot_loop)  # Use eventlet.spawn
-
-
-            # Start the screenshot loop
-            self.streaming = True
-            self.screenshot_thread = eventlet.spawn_n(self.screenshot_loop)
+            # Start the screenshot loop once
+            if not self.streaming:
+                self.streaming = True
+                self.screenshot_thread = eventlet.spawn(self.screenshot_loop)
 
             # Analyze the form fields using Gemini LLM
             self.emit_log('Analyzing form fields with Gemini LLM...')
@@ -307,7 +283,8 @@ class AutomateSubmissionAgent:
                                     confirmation_detected = True
                                     self.take_screenshot(f"Success message detected using selector '{sel}'.")
                                     break
-                        except:
+                        except Exception as e:
+                            self.emit_log(f"Error checking selector '{sel}': {str(e)}")
                             continue
                     if confirmation_detected:
                         break
@@ -322,16 +299,21 @@ class AutomateSubmissionAgent:
                             confirmation_detected = True
                             self.take_screenshot(f"URL changed from {original_url} to {new_url}.")
                             break
-                    except:
+                    except Exception as e:
+                        self.emit_log(f"Error checking URL change: {str(e)}")
                         continue
 
                 elif strat_name == "form_absence":
                     form_selectors = ["form", "div.form-container", "#contact-form"]
                     form_absent = True
                     for form_sel in form_selectors:
-                        if self.page.query_selector(form_sel):
-                            form_absent = False
-                            break
+                        try:
+                            if self.page.query_selector(form_sel):
+                                form_absent = False
+                                break
+                        except Exception as e:
+                            self.emit_log(f"Error checking form selector '{form_sel}': {str(e)}")
+                            continue
                     if form_absent:
                         self.emit_log("Form is no longer present on the page.")
                         confirmation_detected = True
