@@ -1,6 +1,6 @@
 # agents.py
 import eventlet
-eventlet.monkey_patch()
+eventlet.monkey_patch(select=False)  # Ensure 'select' is not monkey patched
 
 import json
 import base64
@@ -126,12 +126,12 @@ class AutomateSubmissionAgent:
             self.take_screenshot('Navigated to Google.')
             eventlet.sleep(1)  # Delay for visibility
 
-            # # Enter search query and perform search
-            # self.page.fill('input[name="q"]', search_query)
-            # self.page.keyboard.press('Enter')
-            # eventlet.sleep(2)  # Delay for search results to load
-            # self.take_screenshot(f'Searching for forms: {search_query}')
-            # eventlet.sleep(1)
+            # Enter search query and perform search
+            self.page.fill('input[name="q"]', search_query)
+            self.page.keyboard.press('Enter')
+            eventlet.sleep(2)  # Delay for search results to load
+            self.take_screenshot(f'Searching for forms: {search_query}')
+            eventlet.sleep(1)
 
             # # Click on the first search result
             # first_result_selector = 'h3'
