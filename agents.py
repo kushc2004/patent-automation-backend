@@ -108,6 +108,7 @@ class AutomateSubmissionAgent:
 
                 # Step 1: Open Google and search for forms
                 await self.emit_log('Navigating to Google...')
+                search_query = self.form_requirements
                 await page.goto(f'https://www.google.com/search?q={search_query}&sourceid=chrome&ie=UTF-8')
                 await self.take_screenshot(page, 'Navigated to Google.')
                 await asyncio.sleep(1)  # Delay for visibility
