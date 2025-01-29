@@ -58,7 +58,7 @@ class AutomateSubmissionAgent:
                     if self.screenshot_buffer:
                         screenshot = self.screenshot_buffer.pop(0)
                         self.socketio.emit('process-screenshot', screenshot, room=self.session_id)
-                await asyncio.sleep(1/20)  # 30fps
+                await asyncio.sleep(1/10)  # 30fps
         except asyncio.CancelledError:
             # Send any remaining screenshots
             async with self.buffer_lock:
