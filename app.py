@@ -5,6 +5,9 @@ import asyncio
 import uvicorn
 import nest_asyncio
 nest_asyncio.apply()
+import eventlet
+import eventlet.wsgi
+
 import os
 import uuid
 import asyncio
@@ -41,7 +44,7 @@ CORS(app, resources={
 })
 
 # Initialize SocketIO with asyncio
-socketio = SocketIO(app, async_mode='asyncio', cors_allowed_origins="*")
+socketio = SocketIO(app, async_mode = "eventlet", cors_allowed_origins="*")
 
 print("Server started.")
 
@@ -146,4 +149,4 @@ async def emit_log(session_id, message):
 
 if __name__ == '__main__':
     # Use Uvicorn to run the app
-    uvicorn.run("app:app", host="0.0.0.0", port=5000, log_level="info")
+    eventlet.wsgi.server(eventlet.listen(("0.0.0.0", 5000)), app)
