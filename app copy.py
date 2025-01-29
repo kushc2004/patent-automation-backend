@@ -1,10 +1,5 @@
 # app.py
-import asyncio
 
-# Run the app with Uvicorn as ASGI server for better asyncio support
-import uvicorn
-import nest_asyncio
-nest_asyncio.apply()
 import os
 import uuid
 import asyncio
@@ -67,7 +62,7 @@ async def submit():
     }
 
     # Start the automation in the background
-    socketio.start_background_task(automation_workflow, data, session_id)
+    socketio.start_background_task(asyncio.create_task, automation_workflow(data, session_id))
     return jsonify({'session_id': session_id}), 200
 
 @socketio.on('join')
@@ -114,16 +109,15 @@ async def automation_workflow(user_data, session_id):
     Coordinates the workflow using different agents.
     """
     try:
-        # # Step 1: Search for websites
-        # search_agent = SearchAgent(user_data.get('requirements', 'Patent submission'))
-        # search_results = await search_agent.search_websites()
-        # if not search_results:
-        #     await emit_log(session_id, "No websites found based on the requirements.")
-        #     return
+        # Step 1: Search for websites
+        search_agent = SearchAgent(user_data.get('requirements', 'Patent submission'))
+        search_results = await search_agent.search_websites()
+        if not search_results:
+            await emit_log(session_id, "No websites found based on the requirements.")
+            return
 
         # Step 2: Select the first website
-        # target_url = search_results[0]
-        target_url = "https://fluentforms.com/forms/contact-form-demo/"
+        target_url = search_results[0]
         await emit_log(session_id, f"Selected website: {target_url}")
         log_info(f"Automation workflow: Selected website {target_url} for session {session_id}")
 
@@ -145,5 +139,12 @@ async def emit_log(session_id, message):
     socketio.emit('process-log', {'message': message}, room=session_id)
 
 if __name__ == '__main__':
-    # Use Uvicorn to run the app
-    uvicorn.run("app:app", host="0.0.0.0", port=5000, log_level="info")
+    import asyncio
+    import uvicorn
+
+    # Use Uvicorn as the ASGI server
+    import nest_asyncio
+    nest_asyncio.apply()
+
+    # Run the app with Uvicorn
+    socketio.run(app, host='0.0.0.0', port=5000)
