@@ -122,30 +122,34 @@ class AutomateSubmissionAgent:
             # Step 1: Open Google and search for forms
             self.emit_log('Navigating to Google...')
             search_query = self.form_requirements
-            self.page.goto(f'https://www.google.com/search?q={search_query}&sourceid=chrome&ie=UTF-8')
-            self.take_screenshot('Navigated to Google.')
-            eventlet.sleep(1)  # Delay for visibility
+            self.emit_log('Navigating to Google...')
+            search_query = self.form_requirements
 
-            # Enter search query and perform search
-            self.page.fill('input[name="q"]', search_query)
-            self.page.keyboard.press('Enter')
-            eventlet.sleep(2)  # Delay for search results to load
-            self.take_screenshot(f'Searching for forms: {search_query}')
+            # Open Google and search
+            self.page.goto(f'https://www.google.com/search?q={search_query}&sourceid=chrome&ie=UTF-8')
+            self.page.wait_for_load_state('networkidle')  # Ensure page is fully loaded
+            self.take_screenshot('Navigated to Google.')
             eventlet.sleep(1)
 
-            # # Click on the first search result
-            # first_result_selector = 'h3'
-            # self.emit_log('Opening the first search result...')
-            # first_result = self.page.query_selector(first_result_selector)
-            # if first_result:
-            #     first_result.click()
-            #     eventlet.sleep(3)  # Delay to allow the page to load
-            #     self.take_screenshot('Opened the first search result.')
-            # else:
-            #     self.emit_log('No search results found.')
-            #     return
-            
+            # Enter search query and perform search
+            # search_box_selector = 'input[name="q"]'
+            # self.page.wait_for_selector(search_box_selector, timeout=5000)
+            # self.page.fill(search_box_selector, search_query)
+            # self.page.keyboard.press('Enter')
+            # self.page.wait_for_load_state('networkidle')
+            # self.take_screenshot(f'Searching for forms: {search_query}')
+            # eventlet.sleep(1)
+
+            # Instead of clicking search results, manually go to the Fluent Forms page
+            self.emit_log('Skipping search results and navigating to the contact form demo...')
             self.page.goto('https://fluentforms.com/forms/contact-form-demo/')
+            self.page.wait_for_load_state('networkidle')
+            self.take_screenshot('Manually navigated to contact form demo.')
+
+            # Start the screenshot loop properly
+            self.streaming = True
+            self.screenshot_thread = eventlet.spawn(self.screenshot_loop)  # Use eventlet.spawn
+
 
             # Start the screenshot loop
             self.streaming = True
