@@ -5,6 +5,7 @@ eventlet.monkey_patch()
 import os
 import uuid
 import asyncio
+import json
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from flask_socketio import SocketIO, join_room
@@ -12,7 +13,6 @@ from dotenv import load_dotenv
 from agents import SearchAgent, FormFillingAgent, VideoStreamingAgent, UserInputAgent
 from typing import Dict, Any
 import google.generativeai as genai
-import json
 
 
 # Load environment variables from .env
@@ -42,14 +42,16 @@ def submit():
     """Handles form submission requests."""
     data = request.get_json()
     input_data = data.get('inputData', {})
-    form_requirements = data.get('formRequirements', 'contact forms')  
+    form_requirements = data.get('formRequirements', 'contact forms')  # Get form search requirements
     session_id = str(uuid.uuid4())
 
-    # Create agents
+    # Create VideoStreamingAgent
     video_agent = VideoStreamingAgent(socketio, session_id)
+
+    # Create UserInputAgent
     user_input_agent = UserInputAgent(socketio, session_id)
 
-    # Store agents in a dictionary
+    # Store agents in the dictionary
     agents_dict[session_id] = {
         'video_agent': video_agent,
         'user_input_agent': user_input_agent,
@@ -57,15 +59,10 @@ def submit():
         'form_filling_agent': None
     }
 
-    # Start video streaming
-    video_agent.start_streaming()
-
-    # Start automation process using eventlet.spawn_n() instead of asyncio.run()
-    eventlet.spawn_n(automate_process, session_id, input_data, form_requirements)
+    # Start automation in the background
+    eventlet.spawn_n(asyncio.run, automate_process(session_id, input_data, form_requirements))
 
     return jsonify({'session_id': session_id}), 200
-
-
 
 async def automate_process(session_id: str, input_data: Dict[str, Any], form_requirements: str):
     """Coordinates the automation process using different agents."""
@@ -77,12 +74,15 @@ async def automate_process(session_id: str, input_data: Dict[str, Any], form_req
         await socketio.emit('process-log', {'message': 'Agents not initialized.'}, room=session_id)
         return
 
+    # Start video streaming within the async context
+    video_agent.start_streaming()
+
     # Create SearchAgent
     search_agent = SearchAgent(socketio, session_id, form_requirements, video_agent)
     agents_dict[session_id]['search_agent'] = search_agent
 
     # Perform search
-    first_result_url = eventlet.with_timeout(30, search_agent.perform_search())
+    first_result_url = await search_agent.perform_search()
     if not first_result_url:
         await video_agent.socketio.emit('process-log', {'message': 'No search result to proceed.'}, room=session_id)
         video_agent.stop_streaming()
@@ -90,7 +90,7 @@ async def automate_process(session_id: str, input_data: Dict[str, Any], form_req
 
     # Navigate to the first result
     await video_agent.socketio.emit('process-log', {'message': f'Navigating to {first_result_url}'}, room=session_id)
-    await eventlet.sleep(3)  # Delay for visibility
+    await asyncio.sleep(3)  # Delay for visibility
 
     # Continue with Playwright navigation
     # Reuse the existing Playwright instance from SearchAgent
@@ -201,13 +201,11 @@ async def automate_process(session_id: str, input_data: Dict[str, Any], form_req
         return
 
     # Start filling the form
-    eventlet.spawn_n(form_filling_agent.fill_form, search_agent.page, input_data)
+    await form_filling_agent.fill_form(page, input_data)
 
     # Submit the form
-    eventlet.spawn_n(form_filling_agent.submit_form, search_agent.page)
+    await form_filling_agent.submit_form(page)
 
-    # Cleanup
-    eventlet.sleep(5)
     # Close all agents
     await search_agent.close_browser()
     video_agent.stop_streaming()
