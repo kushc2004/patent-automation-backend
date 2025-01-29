@@ -57,7 +57,7 @@ class AutomateSubmissionAgent:
                     if self.screenshot_buffer:
                         screenshot = self.screenshot_buffer.pop(0)
                         self.socketio.emit('process-screenshot', screenshot, room=self.session_id)
-                await asyncio.sleep(1/30)  # 30fps
+                await asyncio.sleep(1)  # 30fps
         except asyncio.CancelledError:
             # Send any remaining screenshots
             async with self.buffer_lock:
@@ -65,6 +65,19 @@ class AutomateSubmissionAgent:
                     self.socketio.emit('process-screenshot', screenshot, room=self.session_id)
                 self.screenshot_buffer.clear()
             raise
+        
+        
+    async def take_periodic_screenshots(self, page: Page):
+        """Takes screenshots every second while the page is active."""
+        try:
+            while True:
+                await self.take_screenshot(page, "Continuous capture")
+                await asyncio.sleep(1)  # Capture every second
+        except asyncio.CancelledError:
+            pass
+        except Exception as e:
+            await self.emit_log(f"Periodic screenshot error: {str(e)}")
+
 
     def gemini_client(self, prompt: str, file_paths: List[str] = []) -> str:
         """Generates content using Gemini LLM."""
@@ -101,6 +114,10 @@ class AutomateSubmissionAgent:
                 browser = await p.chromium.launch(headless=True)  # Set headless=False to see the browser actions
                 context = await browser.new_context()
                 page = await context.new_page()
+                
+                self.periodic_screenshot_task = asyncio.create_task(
+                    self.take_periodic_screenshots(page)
+                )
 
                 await self.emit_log('Launching browser...')
                 await self.take_screenshot(page, 'Launching browser.')
@@ -340,10 +357,17 @@ class AutomateSubmissionAgent:
         finally:
             if 'browser' in locals():
                 await browser.close()
+                
             await self.emit_log('Automation process completed.')
             # Stop the streaming task
             if self.streaming_task:
                 self.streaming_task.cancel()
+            if self.periodic_screenshot_task:
+                self.periodic_screenshot_task.cancel()
+                try:
+                    await self.periodic_screenshot_task
+                except asyncio.CancelledError:
+                    pass
             # Optionally, send all buffered screenshots as a video
             await self.send_complete_video()
 
