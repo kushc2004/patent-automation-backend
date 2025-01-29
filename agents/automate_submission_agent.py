@@ -19,7 +19,7 @@ class AutomateSubmissionAgent:
         self.user_input_future: asyncio.Future = None
 
     def configure_genai(self):
-        genai.configure(api_key="YOUR_GEMINI_API_KEY")  # Replace with your actual API key
+        genai.configure(api_key="AIzaSyBa2Boeqwb-nTZ_6IZxesRbawOBasBQr1E")  # Replace with your actual API key
         self.model = genai.GenerativeModel(
             model_name="gemini-1.5-flash-latest",
             generation_config={
@@ -98,7 +98,7 @@ class AutomateSubmissionAgent:
             self.streaming_task = asyncio.create_task(self.stream_screenshots())
 
             async with async_playwright() as p:
-                browser = await p.chromium.launch(headless=False)  # Set headless=False to see the browser actions
+                browser = await p.chromium.launch(headless=True)  # Set headless=False to see the browser actions
                 context = await browser.new_context()
                 page = await context.new_page()
 
