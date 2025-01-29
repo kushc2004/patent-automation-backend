@@ -33,8 +33,7 @@ class AutomateSubmissionAgent:
 
     async def emit_log(self, message: str):
         """Emits a log message to the session room."""
-        await self.socketio.emit('process-log', {'message': message}, room=self.session_id)
-        print(f"[{self.session_id}] {message}")  # For server-side debugging
+        self.socketio.emit('process-log', {'message': message}, room=self.session_id)
 
     async def take_screenshot(self, page: Page, step_description: str):
         """Takes a screenshot and adds it to the buffer."""
@@ -57,18 +56,15 @@ class AutomateSubmissionAgent:
                 async with self.buffer_lock:
                     if self.screenshot_buffer:
                         screenshot = self.screenshot_buffer.pop(0)
-                        await self.socketio.emit('process-screenshot', screenshot, room=self.session_id)
-                        await self.emit_log(f"Emitted screenshot: {screenshot['description']}")
+                        self.socketio.emit('process-screenshot', screenshot, room=self.session_id)
                 await asyncio.sleep(1/30)  # 30fps
         except asyncio.CancelledError:
             # Send any remaining screenshots
             async with self.buffer_lock:
                 for screenshot in self.screenshot_buffer:
-                    await self.socketio.emit('process-screenshot', screenshot, room=self.session_id)
+                    self.socketio.emit('process-screenshot', screenshot, room=self.session_id)
                 self.screenshot_buffer.clear()
             raise
-        except Exception as e:
-            await self.emit_log(f"Error in stream_screenshots: {str(e)}")
 
     def gemini_client(self, prompt: str, file_paths: List[str] = []) -> str:
         """Generates content using Gemini LLM."""
@@ -82,15 +78,10 @@ class AutomateSubmissionAgent:
     async def prompt_user_for_input(self, prompt: str) -> Any:
         """Prompts the user for input and waits for the response."""
         self.user_input_future = asyncio.get_event_loop().create_future()
-        await self.socketio.emit('request-user-input', {'prompt': prompt}, room=self.session_id)
+        self.socketio.emit('request-user-input', {'prompt': prompt}, room=self.session_id)
         await self.emit_log("Awaiting user input...")
-        try:
-            user_input = await self.user_input_future
-            await self.emit_log("User input received.")
-            return user_input
-        except Exception as e:
-            await self.emit_log(f"Error waiting for user input: {str(e)}")
-            return {}
+        user_input = await self.user_input_future
+        return user_input
 
     def handle_user_input(self, data: Any):
         """Handles the user input received from the frontend."""
@@ -115,19 +106,48 @@ class AutomateSubmissionAgent:
                 await self.take_screenshot(page, 'Launching browser.')
                 await asyncio.sleep(1)  # Delay for visibility
 
-                # Step 1: Navigate to the contact form demo directly
-                await self.emit_log('Navigating to the contact form demo...')
+                # Step 1: Open Google and search for forms
+                await self.emit_log('Navigating to Google...')
+                search_query = self.form_requirements
+                await page.goto(f'https://www.google.com/search?q={search_query}&sourceid=chrome&ie=UTF-8')
+                await self.take_screenshot(page, 'Navigated to Google.')
+                await asyncio.sleep(1)  # Delay for visibility
+
+                # Enter search query
+                # search_query = self.form_requirements
+                # await self.emit_log(f'Searching for forms: {search_query}')
+                # await page.fill('input[name="q"]', search_query)
+                # await page.keyboard.press('Enter')
+                # await asyncio.sleep(2)  # Delay for search results to load
+                # await self.take_screenshot(page, f'Searching for forms: {search_query}')
+                # await asyncio.sleep(1)
+
+                # # Click on the first search result
+                # first_result_selector = 'h3'
+                # await self.emit_log('Opening the first search result...')
+                # first_result = await page.query_selector(first_result_selector)
+                # if first_result:
+                #     await first_result.click()
+                #     await asyncio.sleep(3)  # Delay to allow the page to load
+                #     await self.take_screenshot(page, 'Opened the first search result.')
+                # else:
+                #     await self.emit_log('No search results found.')
+                #     return
+
+                
                 await page.goto('https://fluentforms.com/forms/contact-form-demo/')
-                await page.wait_for_load_state('networkidle')
-                await self.take_screenshot(page, 'Navigated to contact form demo.')
-                await self.emit_log('Navigated to contact form demo.')
+                
+                # Now, the first link should be opened. Start filling the form.
+                await self.emit_log('Starting to fill out the form...')
+                await self.take_screenshot(page, 'Form page loaded.')
+                await asyncio.sleep(1)
 
                 # Analyze the form fields using Gemini LLM
                 await self.emit_log('Analyzing form fields with Gemini LLM...')
                 page_content = await page.content()
 
                 prompt = (
-                    "You are provided with the HTML content of a web form and user input data in JSON format. "
+                    "You are provided with the HTML content of a web form and user input data in arbitrary format. "
                     "Your task is to analyze the user input and map it to the form fields present in the HTML content. "
                     "Identify each form field's label, name, type, and CSS selector. Determine the appropriate value to fill "
                     "into each field based on the user input. If any required data is missing from the user input, "
@@ -188,7 +208,7 @@ class AutomateSubmissionAgent:
                     await self.take_screenshot(page, 'Extracted form details.')
 
                     # Emit suggested fields to the frontend
-                    await self.socketio.emit('suggested-fields', {
+                    self.socketio.emit('suggested-fields', {
                         'fields': form_fields,
                         'confirmation_strategies': confirmation_strategies
                     }, room=self.session_id)
@@ -212,7 +232,7 @@ class AutomateSubmissionAgent:
 
                         # If the field requires a file upload
                         if field_type == 'file':
-                            await self.socketio.emit('request-file-upload', {
+                            self.socketio.emit('request-file-upload', {
                                 'prompt': f"Please upload a file for the field '{field_name}' ({field.get('label')})."
                             }, room=self.session_id)
                             file_upload = await self.prompt_user_for_input("file_upload")
@@ -274,8 +294,7 @@ class AutomateSubmissionAgent:
                                         confirmation_detected = True
                                         await self.take_screenshot(page, f"Success message detected using selector '{sel}'.")
                                         break
-                            except Exception as e:
-                                await self.emit_log(f"Error checking selector '{sel}': {str(e)}")
+                            except:
                                 continue
                         if confirmation_detected:
                             break
@@ -290,21 +309,16 @@ class AutomateSubmissionAgent:
                                 confirmation_detected = True
                                 await self.take_screenshot(page, f"URL changed from {original_url} to {new_url}.")
                                 break
-                        except Exception as e:
-                            await self.emit_log(f"Error checking URL change: {str(e)}")
+                        except:
                             continue
 
                     elif strat_name == "form_absence":
                         form_selectors = ["form", "div.form-container", "#contact-form"]
                         form_absent = True
                         for form_sel in form_selectors:
-                            try:
-                                if await page.query_selector(form_sel):
-                                    form_absent = False
-                                    break
-                            except Exception as e:
-                                await self.emit_log(f"Error checking form selector '{form_sel}': {str(e)}")
-                                continue
+                            if await page.query_selector(form_sel):
+                                form_absent = False
+                                break
                         if form_absent:
                             await self.emit_log("Form is no longer present on the page.")
                             confirmation_detected = True
@@ -337,7 +351,7 @@ class AutomateSubmissionAgent:
         """Sends all buffered screenshots as a video after completion."""
         async with self.buffer_lock:
             for screenshot in self.screenshot_buffer:
-                await self.socketio.emit('process-screenshot', screenshot, room=self.session_id)
+                self.socketio.emit('process-screenshot', screenshot, room=self.session_id)
             self.screenshot_buffer.clear()
 
     def receive_user_input(self, data: Any):

@@ -1,7 +1,5 @@
-# app.py
-import eventlet
-eventlet.monkey_patch(select=False)  # Prevent Eventlet from monkey patching 'select'
-
+# app.py (Reiterated for clarity)
+import asyncio
 import os
 import uuid
 from flask import Flask, request, jsonify
@@ -26,7 +24,8 @@ CORS(app, resources={
         ]
     }
 })
-socketio = SocketIO(app, async_mode='eventlet', cors_allowed_origins="*")
+# Initialize SocketIO with async_mode='asyncio'
+socketio = SocketIO(app, async_mode='asyncio', cors_allowed_origins="*")
 
 print("Server started.")
 
@@ -34,7 +33,7 @@ print("Server started.")
 agents_dict: Dict[str, AutomateSubmissionAgent] = {}
 
 @app.route('/api/submit', methods=['POST'])
-def submit():
+async def submit():
     """Handles form submission requests."""
     data = request.get_json()
     input_data = data.get('inputData', {})
@@ -45,13 +44,13 @@ def submit():
     agent = AutomateSubmissionAgent(socketio, session_id, input_data, form_requirements)
     agents_dict[session_id] = agent
 
-    # Start the automation process in a separate green thread
-    eventlet.spawn_n(agent.automate_submission)
+    # Start the automation process in a separate task
+    asyncio.create_task(agent.automate_submission())
 
     return jsonify({'session_id': session_id}), 200
 
 @socketio.on('join')
-def on_join(data):
+async def on_join(data):
     """Handles a client joining a session room."""
     session_id = data.get('session_id')
     if session_id:
@@ -61,7 +60,7 @@ def on_join(data):
         print("Error: No session_id provided in join event.")
 
 @socketio.on('user-input')
-def handle_user_input_event(data):
+async def handle_user_input_event(data):
     """Handles user input sent from the frontend."""
     session_id = data.get('session_id')
     user_input = data.get('input')  # This should be a dictionary containing the required data
@@ -73,4 +72,5 @@ def handle_user_input_event(data):
         print(f"No agent found for session_id: {session_id}")
 
 if __name__ == '__main__':
+    # Run the SocketIO server with asyncio
     socketio.run(app, host='0.0.0.0', port=5000)
