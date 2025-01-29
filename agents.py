@@ -126,10 +126,10 @@ class AutomateSubmissionAgent:
             search_query = self.form_requirements
 
             # Open Google and search
-            self.page.goto(f'https://www.google.com/search?q={search_query}&sourceid=chrome&ie=UTF-8')
-            self.page.wait_for_load_state('networkidle')  # Ensure page is fully loaded
-            self.take_screenshot('Navigated to Google.')
-            eventlet.sleep(1)
+            # self.page.goto(f'https://www.google.com/search?q={search_query}&sourceid=chrome&ie=UTF-8')
+            # self.page.wait_for_load_state('networkidle')  # Ensure page is fully loaded
+            # self.take_screenshot('Navigated to Google.')
+            #eventlet.sleep(1)
 
             # Enter search query and perform search
             # search_box_selector = 'input[name="q"]'
