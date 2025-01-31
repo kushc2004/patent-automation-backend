@@ -153,7 +153,7 @@ class AutomateSubmissionAgent:
                 #     return
 
                 
-                await page.goto('https://fluentforms.com/forms/contact-form-demo/')
+                await page.goto('https://docs.google.com/forms/d/e/1FAIpQLSdV-FnNlpkdiPzqMSD0oBAanFDhclfvw9il9tNvrlHTA4Z4bA/viewform')
                 
                 # Now, the first link should be opened. Start filling the form.
                 await self.emit_log('Starting to fill out the form...')
