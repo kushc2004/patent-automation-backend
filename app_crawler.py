@@ -1,4 +1,7 @@
 # app.py
+import eventlet
+eventlet.monkey_patch()
+
 from flask import Flask, request, jsonify
 from flask_socketio import SocketIO, join_room, leave_room
 from agent_crawler import WebsiteCrawlerAgent
@@ -19,7 +22,7 @@ CORS(app, resources={
     }
 })
 # Initialize SocketIO with async_mode='asyncio'
-socketio = SocketIO(app, async_mode='asyncio', cors_allowed_origins="*")
+socketio = SocketIO(app, async_mode='eventlet', cors_allowed_origins="*")
 
 agents = {}  # To keep track of active agents
 
