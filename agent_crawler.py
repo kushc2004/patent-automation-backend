@@ -174,5 +174,9 @@ class WebsiteCrawlerAgent:
         await self.emit_log('Results emitted to frontend.')
 
     def start(self):
-        """Starts the crawling process."""
-        asyncio.create_task(self.crawl())
+        """Starts the crawling process in an asyncio event loop."""
+        try:
+            asyncio.run(self.crawl())  # Ensures an event loop is created
+        except RuntimeError as e:
+            self.socketio.emit('process-log', {'message': f"RuntimeError: {str(e)}"}, room=self.session_id)
+
