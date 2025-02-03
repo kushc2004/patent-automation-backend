@@ -48,6 +48,7 @@ const Home = () => {
             { title: "Redact", description: "Redact sensitive information securely.", path: "/redact" },
             { title: "Patent", description: "Draft Patent.", path: "/patent" },
             { title: "Admin Dashboard", description: "Dashboard for Admin to see the user activities.", path: "/admin" },
+            { title: "Startup Dashboard", description: "Dashboard for Startups.", path: "/startup-application" },
         ] : [])
     ];
 

@@ -61,7 +61,7 @@ const ChatPage = () => {
                 }
             } catch (error) {
                 console.error("Error fetching chat histories:", error.message);
-                toast.error("Error fetching chat histories.");
+                //toast.error("Error fetching chat histories.");
             }
         };
 

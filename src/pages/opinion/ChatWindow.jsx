@@ -45,7 +45,7 @@ Now answer the user query:
 
 // Client function to interact with Gemini API
 const client = async (prompt, history) => {
-    const apiKey = "AIzaSyBSbMTaBPs5qD13ZBLuyQvvH4MNmOAyG9E"; // Replace with your actual API key
+    const apiKey = "AIzaSyBa2Boeqwb-nTZ_6IZxesRbawOBasBQr1E"; // Replace with your actual API key
     if (!apiKey) {
         throw new Error("Gemini API key is not set.");
     }
@@ -373,7 +373,7 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
             formData.append("query", facts);
             formData.append("category", category);
             formData.append("status", caseState);
-            formData.append("opinion_direction", direction);
+            formData.append("opinion_direction", opinionDirection);
             setCaseCategory(category);
             
             // Append each file to formData

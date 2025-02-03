@@ -16,6 +16,12 @@ import PatentPage from './pages/patent/PatentPage'
 import DraftPage from './pages/patent/DraftPage';
 import AdminPage from './pages/admin/AdminPage';
 import FeatureView from './pages/admin/FeatureView';
+import StartupPage from './pages/startup/StartupPage';
+import ApplicationForm from './pages/startup/ApplicationForm';
+import VCOutreach from './pages/startup/VCOutreach';
+import ProgramSearch from './pages/startup/ProgramSearch'
+import AutomateSubmissionPage from './pages/agents/AutomateSubmissionPage';
+import SiteCrawler from './pages/agents/SiteCrawler'
 
 
 function App() {
@@ -42,6 +48,12 @@ function App() {
     <Route path="/select" element={<SelectPage />} />
     <Route path="/admin" element={<AdminPage />} />
     <Route path="/feature/:feature" element={<FeatureView />} />
+    <Route path="/startup-application" element={<ApplicationForm />} />
+    <Route path="/startup-dashboard" element={<StartupPage />} />
+    <Route path="/startup-vcoutreach" element={<VCOutreach />} />
+    <Route path="/startup-programs" element={<ProgramSearch />} />
+    <Route path="/startup-auto-form" element={<AutomateSubmissionPage />} />
+    <Route path="/crawler" element={<SiteCrawler />} />
     <Route path="*" element={<Navigate to="/" />} />
   </Routes>
 </Router>

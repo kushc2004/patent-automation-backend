@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 
-const client = async (prompt, history) => {
+const client = async (prompt, history=[]) => {
     const apiKey = "AIzaSyBa2Boeqwb-nTZ_6IZxesRbawOBasBQr1E";
     if (!apiKey) {
         throw new Error("Gemini API key is not set.");
