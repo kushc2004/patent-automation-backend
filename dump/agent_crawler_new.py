@@ -26,7 +26,6 @@ class SiteCrawlerAgent:
         self.buffer_lock = asyncio.Lock()
         self.streaming_task: asyncio.Task = None
         self.periodic_screenshot_task: asyncio.Task = None
-        self.all_candidate_links: List[Dict[str, str]] = []
 
         # Collected results
         self.emails: Set[str] = set()
@@ -101,26 +100,27 @@ class SiteCrawlerAgent:
             response = self.model.generate_content(prompt)
         return response.text
 
-    def create_navigation_prompt(self, current_url: str, page_body: str, links: List[Dict[str, str]]) -> str:
+    def create_navigation_prompt(self, current_url: str, page_content: str, links: List[Dict[str, str]]) -> str:
         """
         Creates a structured prompt for Gemini LLM.
-        The prompt instructs the model to decide what navigation action to take next.
+        The prompt now instructs the model to analyze 'Contact Us' pages 
+        and detect embedded form links, even if they lead to external domains.
         """
         prompt = (
             "You are analyzing a webpage to extract relevant navigation actions. "
-            "Your task is to find **email addresses, contact forms, join/application forms, and onboarding links.**\n\n"
-            "You are provided with:\n"
+            "Your task is to find **email addresses, contact forms, join/application forms, and onboarding links.** "
+            "You are provided with:\n\n"
             "- The **current URL**\n"
-            "- **Extracted candidate links** (each with URL, anchor text, context, and one-line description)\n"
-            "- The **text content of the page body** (excluding JavaScript and other non-content elements)\n\n"
+            "- **Extracted candidate links** (list of URLs with anchor text)\n"
+            "- **Full HTML content** of the page\n\n"
             "**Important Guidelines:**\n"
-            "1. Prioritize links inside divs or buttons related to onboarding, applications, hiring, or partnerships.\n"
-            "2. If the page is a Contact Us page, look for additional links to external forms (e.g., Google Forms, Typeform).\n"
-            "3. Do not stop if you reach a 'Contact Us' page; instead, analyze if the page contains form links and navigate to them.\n"
-            "4. Consider navigation context: if a section mentions 'Tell us about your company', 'Become a partner', or 'Employment opportunities', prefer those links.\n"
-            "5. If multiple links match, prioritize the most relevant one.\n"
+            "1. Prioritize **links inside divs or buttons** related to onboarding, applications, hiring, or partnerships.\n"
+            "2. If the page is a **Contact Us page**, look for additional links to external forms (Google Forms, Typeform, Jotform, HubSpot, etc.).\n"
+            "3. Do not stop if you reach a 'Contact Us' page. Instead, analyze if the page contains form links and navigate to them.\n"
+            "4. Consider navigation context: If a section has **'Tell us about your company'**, **'Become a partner'**, or **'Employment opportunities'**, prefer links inside them.\n"
+            "5. If multiple links match, prioritize the most relevant **application or onboarding-related link.**\n"
             "6. If no useful links exist, return to the homepage.\n\n"
-            "Provide the output in the following **JSON format**:\n\n"
+            "Provide the output in this **JSON format**:\n\n"
             "```json\n"
             "{\n"
             "  \"action\": \"click\", \n"
@@ -129,15 +129,15 @@ class SiteCrawlerAgent:
             "}\n"
             "```\n\n"
             f"**Current URL:** {current_url}\n\n"
-            "**Extracted candidate links (with URL, anchor text, context, and description):**\n"
+            "**Extracted candidate links (URLs with anchor text):**\n"
             f"{json.dumps(links, indent=2)}\n\n"
-            "**Page Body Text (truncated):**\n"
-            f"{page_body[:10000]}\n\n"
+            "**HTML Content of the page (truncated for brevity):**\n"
+            f"{page_content[:10000]}\n\n"  # Limit to avoid API overload
             "Decide the best next action based on the provided structure."
         )
         return prompt
 
-    def decide_next_action(self, current_url: str, page_body: str, links: List[Dict[str, str]]) -> Dict[str, Any]:
+    def decide_next_action(self, current_url: str, page_content: str, links: List[Dict[str, str]]) -> Dict[str, Any]:
         """
         Calls Gemini LLM with a structured prompt to decide what to do next.
         Returns a dict with keys:
@@ -145,57 +145,20 @@ class SiteCrawlerAgent:
           - link: if action is "click", the URL to follow (optional)
           - reason: explanation text
         """
-        prompt = self.create_navigation_prompt(current_url, page_body, links)
+        prompt = self.create_navigation_prompt(current_url, page_content, links)
         lml_response = self.gemini_client(prompt)
         try:
             decision = json.loads(lml_response)
             return decision
         except json.JSONDecodeError:
-            # Fallback: choose first link that contains a keyword
+            # Fallback to a default decision (for example, pick the first link that contains a keyword)
             for item in links:
                 if re.search(r"contact|join|apply", item.get("text", "").lower()):
                     return {"action": "click", "link": item["url"], "reason": "Default fallback on keyword."}
             return {"action": "back", "link": self.start_url, "reason": "No suitable link found; returning to homepage."}
 
-    def get_link_descriptions(self, current_url: str, links: List[Dict[str, str]], page_body: str) -> List[Dict[str, str]]:
-        """
-        For each candidate link, uses Gemini LLM to generate a concise one-line description.
-        The prompt now includes both the anchor text and a 'context' field (extracted from the nearest parent div)
-        so that the description is based on the entire container.
-        Returns the list of links updated with an additional 'description' field.
-        """
-        prompt = (
-            "You are given a list of candidate links from a webpage. Each link object has the keys 'url', 'text', and 'context'.\n"
-            "The 'text' is the text of the <a> tag, and 'context' is the text from any of it's parent <div>. You need to analyse the whole page to get the context of what the link is relating to.\n"
-            " - Example: The <a> tag text might have written 'continue' but any of its parent <div>s might have more context of the link like 'Tell us about your company', this means that the continue button is for this. To tell more about the company, and it might be a contact us form or anything related."
-            "Using the provided context, generate a concise one-line description that summarizes what the link likely points to.\n\n"
-            "For example:\n"
-            "```\n"
-            '[{"url": "https://example.com/contact", "description": "Contact us page with support details."}, {"url": "https://example.com/apply", "description": "Founders application form."}]\n'
-            "```\n\n"
-            
-            "The content related to the page is below:"
-            f"Current URL: {current_url}\n\n"
-            f"Candidate links: {json.dumps(links, indent=2)}\n\n"
-            "**Page Body Text (truncated):**\n"
-            f"{page_body}\n\n"
-            "Provide your answer in JSON format."
-        )
-        result = self.gemini_client(prompt)
-        try:
-            descriptions = json.loads(result)
-            # Create mapping from URL to description
-            desc_map = {item["url"]: item["description"] for item in descriptions if "url" in item and "description" in item}
-            for link in links:
-                link["description"] = desc_map.get(link["url"], "No description available")
-            return links
-        except Exception as e:
-            for link in links:
-                link["description"] = "No description available"
-            return links
-
     async def crawl_site(self):
-        """Crawls the site and uses Gemini LLM to decide navigation actions."""
+        """Crawls the site and extracts only form links with descriptions, emails, and pages crawled."""
         await self.emit_log("Starting site crawl...")
         pages_visited = 0
         visited_urls = set()
@@ -210,10 +173,9 @@ class SiteCrawlerAgent:
             browser = await p.chromium.launch(headless=True)
             context = await browser.new_context()
             page = await context.new_page()
-
-            # Start streaming screenshots
-            self.streaming_task = asyncio.create_task(self.stream_screenshots())
-            self.periodic_screenshot_task = asyncio.create_task(self.take_periodic_screenshots(page))
+            
+            # Store extracted form links with descriptions
+            extracted_form_links = []
 
             while to_visit and pages_visited < self.max_pages:
                 current_url = to_visit.pop(0)
@@ -231,18 +193,12 @@ class SiteCrawlerAgent:
                     await self.emit_log(f"Error loading {current_url}: {str(e)}")
                     continue
 
-                # Get full HTML content if needed (for decision making)...
+                # Get page content
                 try:
                     page_content = await page.content()
                 except Exception as e:
                     await self.emit_log(f"Error getting content from {current_url}: {str(e)}")
                     continue
-
-                # Extract only the text content of the page body (excluding JS/CSS)
-                try:
-                    page_body = await page.evaluate("() => document.body.innerHTML")
-                except Exception as e:
-                    page_body = page_content  # Fallback if evaluation fails
 
                 # Search for email addresses in the page
                 new_emails = set(re.findall(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", page_content))
@@ -250,77 +206,43 @@ class SiteCrawlerAgent:
                     self.emails.update(new_emails)
                     await self.emit_log(f"Found emails: {', '.join(new_emails)}")
 
-                # Gather all candidate links (including external form links)
-                candidate_links = []
-                form_links = []  # For potential form links
+                # Gather only form-related links
+                form_links = []
 
                 try:
                     anchors = await page.query_selector_all("a")
                     for anchor in anchors:
                         try:
                             href = await anchor.get_attribute("href")
-                            anchor_text = (await anchor.inner_text()).strip() or ""
-                            # Get context from the nearest parent <div>
-                            context_text = await page.evaluate(
-                                """(element) => {
-                                    let parent = element.parentElement;
-                                    while (parent) {
-                                        if (parent.tagName && parent.tagName.toLowerCase() === "div") {
-                                            return parent.innerText;
-                                        }
-                                        parent = parent.parentElement;
-                                    }
-                                    return "";
-                                }""", anchor)
+                            text = (await anchor.inner_text()).strip() or ""
                             if href:
                                 absolute_url = urljoin(current_url, href)
-                                candidate_links.append({
-                                    "url": absolute_url,
-                                    "text": anchor_text,
-                                    "context": context_text.strip() if context_text else ""
-                                })
+
                                 # Detect external form-related links
                                 if re.search(r"typeform|google.com/forms|jotform|hubspot|airtable", absolute_url.lower()):
-                                    form_links.append({
-                                        "url": absolute_url,
-                                        "text": anchor_text,
-                                        "context": context_text.strip() if context_text else ""
-                                    })
-                                    self.contact_links.add(absolute_url)
+                                    form_links.append({"url": absolute_url, "text": text})
+                                
                                 # Detect form-related text patterns
-                                if re.search(r"apply|join|form|sign[- ]?up|register|partner", anchor_text.lower()):
-                                    form_links.append({
-                                        "url": absolute_url,
-                                        "text": anchor_text,
-                                        "context": context_text.strip() if context_text else ""
-                                    })
-                                    self.contact_links.add(absolute_url)
+                                elif re.search(r"apply|join|form|sign[- ]?up|register|partner", text.lower()):
+                                    form_links.append({"url": absolute_url, "text": text})
                         except Exception as e:
-                            await self.emit_log(f"Error processing an anchor on {current_url}: {str(e)}")
-                    if form_links:
-                        candidate_links = form_links + candidate_links
+                            await self.emit_log(f"Error processing anchors on {current_url}: {str(e)}")
                 except Exception as e:
-                    await self.emit_log(f"Error processing anchors on {current_url}: {str(e)}")
+                    await self.emit_log(f"Error extracting links from {current_url}: {str(e)}")
                     continue
-
-                # Generate one-line descriptions using only the page body text (excludes JS/CSS)
-                await self.emit_log("Generating one-line descriptions for candidate links.")
                 
-                await self.emit_log(f"\nPage Body: {page_body}\n")
-                
-                described_links = self.get_link_descriptions(current_url, candidate_links, page_body)
-                self.all_candidate_links.extend(described_links)
-
-                # Use the page body text (rather than full HTML) in the decision prompt
-                decision = self.decide_next_action(current_url, page_body, candidate_links)
+                                # Call Gemini LLM to decide next action
+                decision = self.decide_next_action(current_url, page_content, form_links)
                 await self.emit_log(f"Gemini decision: {decision}")
                 action = decision.get("action", "back")
                 chosen_link = decision.get("link", self.start_url)
 
+                # Depending on the decision, add the chosen link to the to_visit list.
                 if action == "click":
                     if chosen_link not in visited_urls:
                         to_visit.append(chosen_link)
                     else:
+                        # If already visited, fallback to homepage
                         to_visit.append(self.start_url)
                 elif action == "back":
                     to_visit.append(self.start_url)
@@ -328,25 +250,56 @@ class SiteCrawlerAgent:
                     await self.emit_log("Gemini instructed to stop crawling.")
                     break
                 else:
+                    # Unknown action fallback to homepage
                     to_visit.append(self.start_url)
 
-                await asyncio.sleep(2)
+                await asyncio.sleep(2)  # Small delay before next iteration
+
+                # Generate descriptions for extracted form links
+                for link in form_links:
+                    prompt = (
+                        f"Analyze the following form link:\n"
+                        f"URL: {link['url']}\n"
+                        f"Anchor text: {link['text']}\n\n"
+                        f"Based on the context, generate a **one-line** description of what this form is for. "
+                        f"Examples: 'Application form for startups', 'Partnership registration form', 'Hiring application form'.\n"
+                        f"Provide the output **only as a JSON object** like:\n"
+                        f"```json\n{{\"description\": \"This is a form for hiring applications.\"}}\n```\n"
+                    )
+
+                    # Get description from Gemini LLM
+                    try:
+                        response = self.gemini_client(prompt)
+                        description = json.loads(response).get("description", "No description available.")
+                    except Exception as e:
+                        description = "No description available."
+
+                    extracted_form_links.append({
+                        "url": link["url"],
+                        "description": description
+                    })
+
+                # Stop if we have gathered sufficient form links
+                if len(extracted_form_links) >= 5:
+                    break  # Stop after collecting a few forms
 
             await self.emit_log("Crawl completed.")
-            results = {
+            
+            # Emit the results to the frontend
+            self.socketio.emit('form-links', {
+                "form_links": extracted_form_links,
                 "emails": list(self.emails),
-                "contact_links": list(self.contact_links),
-                "join_links": list(self.join_links),
-                "pages_crawled": pages_visited,
-                "candidate_links": self.all_candidate_links
-            }
-            self.socketio.emit('crawl-results', results, room=self.session_id)
+                "pages_crawled": pages_visited
+            }, room=self.session_id)
+
             await browser.close()
 
+        # Cancel streaming tasks
         if self.streaming_task:
             self.streaming_task.cancel()
         if self.periodic_screenshot_task:
             self.periodic_screenshot_task.cancel()
+
 
     async def send_complete_video(self):
         """Sends all buffered screenshots as a video after completion."""

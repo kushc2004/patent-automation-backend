@@ -173,8 +173,6 @@ class SiteCrawlerAgent:
             "```\n"
             '[{"url": "https://example.com/contact", "description": "Contact us page with support details."}, {"url": "https://example.com/apply", "description": "Founders application form."}]\n'
             "```\n\n"
-            
-            "The content related to the page is below:"
             f"Current URL: {current_url}\n\n"
             f"Candidate links: {json.dumps(links, indent=2)}\n\n"
             "**Page Body Text (truncated):**\n"
@@ -305,9 +303,6 @@ class SiteCrawlerAgent:
 
                 # Generate one-line descriptions using only the page body text (excludes JS/CSS)
                 await self.emit_log("Generating one-line descriptions for candidate links.")
-                
-                await self.emit_log(f"\nPage Body: {page_body}\n")
-                
                 described_links = self.get_link_descriptions(current_url, candidate_links, page_body)
                 self.all_candidate_links.extend(described_links)
 

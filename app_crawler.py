@@ -4,7 +4,7 @@ eventlet.monkey_patch()
 
 from flask import Flask, request, jsonify
 from flask_socketio import SocketIO, join_room, leave_room
-from agent_crawler import WebsiteCrawlerAgent
+from agent_crawler import SiteCrawlerAgent
 from agents_old import AutomateSubmissionAgent
 import uuid
 from flask_cors import CORS
@@ -15,6 +15,7 @@ CORS(app, resources={
     r"/*": {
         "origins": [
             "http://localhost:3000",
+            "http://localhost:3001",
             "https://legalai-frontend.onrender.com",
             "https://banthry.in",
             "https://www.banthry.in"
@@ -26,19 +27,24 @@ socketio = SocketIO(app, async_mode='eventlet', cors_allowed_origins="*")
 
 agents = {}  # To keep track of active agents
 
+import asyncio
+
 @app.route('/api/crawl', methods=['POST'])
 def start_crawl():
     data = request.json
-    home_url = data.get('home_url')
-    if not home_url:
-        return jsonify({'error': 'home_url is required'}), 400
+    startUrl = data.get('startUrl')
+    if not startUrl:
+        return jsonify({'error': 'startUrl is required'}), 400
 
     session_id = str(uuid.uuid4())
-    agent = WebsiteCrawlerAgent(socketio, session_id, home_url)
+    agent = SiteCrawlerAgent(socketio, session_id, startUrl)
     agents[session_id] = agent
-    agent.start()
+
+    # Properly schedule the coroutine
+    eventlet.spawn_n(asyncio.run, agent.run())
 
     return jsonify({'session_id': session_id})
+
 
 @socketio.on('join')
 def on_join(data):
@@ -51,4 +57,4 @@ def on_disconnect():
     print('Client disconnected')
 
 if __name__ == '__main__':
-    socketio.run(app, host='0.0.0.0', port=5000)
+    socketio.run(app, host='0.0.0.0', port=5001)

@@ -9,7 +9,8 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from flask_socketio import SocketIO, join_room
 from dotenv import load_dotenv
-from agents_old import AutomateSubmissionAgent  # Import the new agent class
+from agents_old import AutomateSubmissionAgent
+from agent_crawler import SiteCrawlerAgent
 from typing import Dict, Any, List
 
 # Load environment variables from .env
@@ -21,6 +22,7 @@ CORS(app, resources={
     r"/*": {
         "origins": [
             "http://localhost:3000",
+            "http://localhost:3001",
             "https://legalai-frontend.onrender.com",
             "https://banthry.in",
             "https://www.banthry.in"
@@ -40,15 +42,34 @@ def submit():
     """Handles form submission requests."""
     data = request.get_json()
     input_data = data.get('inputData', {})
-    form_requirements = data.get('formRequirements', 'contact forms')  # Get form search requirements
+    formURL = data.get('formURL')
+    uniqueIdentifier = data.get('uniqueIdentifier')
+    form_requirements = data.get('formRequirements', 'contact forms')
     session_id = str(uuid.uuid4())
 
     # Instantiate the agent and start the automation in the background
-    agent = AutomateSubmissionAgent(socketio, session_id, input_data, form_requirements)
+    agent = AutomateSubmissionAgent(socketio, session_id, input_data, formURL)
     agents_dict[session_id] = agent
     eventlet.spawn_n(asyncio.run, agent.automate_submission())
     return jsonify({'session_id': session_id}), 200
 
+
+@app.route('/api/crawl', methods=['POST'])
+def start_crawl():
+    data = request.json
+    startUrl = data.get('startUrl')
+    uniqueIdentifier = data.get('uniqueIdentifier')
+    if not startUrl:
+        return jsonify({'error': 'startUrl is required'}), 400
+
+    session_id = str(uuid.uuid4())
+    agent = SiteCrawlerAgent(socketio, session_id, startUrl)
+    agents_dict[session_id] = agent
+
+    # Properly schedule the coroutine
+    eventlet.spawn_n(asyncio.run, agent.run())
+
+    return jsonify({'session_id': session_id})
 
 @socketio.on('join')
 def on_join(data):
@@ -60,6 +81,9 @@ def on_join(data):
     else:
         print("Error: No session_id provided in join event.")
 
+@socketio.on('disconnect')
+def on_disconnect():
+    print('Client disconnected')
 
 @socketio.on('user-input')
 def handle_user_input_event(data):
@@ -75,4 +99,4 @@ def handle_user_input_event(data):
 
 
 if __name__ == '__main__':
-    socketio.run(app, host='0.0.0.0', port=5000)
+    socketio.run(app, host='0.0.0.0', port=5001)
