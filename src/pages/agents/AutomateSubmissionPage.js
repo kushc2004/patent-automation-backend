@@ -5,7 +5,7 @@ import { useLocation } from 'react-router-dom';
 
 import useUploadFile from '../../components/useUploadFile';
 
-const socket = io('http://34.68.45.14:5000'); // Replace with your backend's IP
+const socket = io('http://0.0.0.0:5001'); // Replace with your backend's IP
 
 function AutomateSubmissionPage() {
 
@@ -83,7 +83,7 @@ function AutomateSubmissionPage() {
   const handleSubmit = async (e) => {
     //e.preventDefault();
     try {
-      const response = await fetch('http://34.68.45.14:5000/api/submit', {
+      const response = await fetch('http://0.0.0.0:5001/api/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),

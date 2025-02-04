@@ -17,6 +17,8 @@ const SearchPanel = ({ openCaseOverlay, isCaseOverlayOpen, setIsCaseOverlayOpen,
     setSelectedSearchCases(selectedCases);
   }, [selectedCases, setSelectedSearchCases]);
 
+  console.log("setSelectedSearchCases: ", selectedCases);
+
   const [uploadedFiles, setUploadedFiles] = useState([]);
   const [selectedFiles, setSelectedFiles] = useState([]);
 
@@ -207,7 +209,10 @@ const SearchPanel = ({ openCaseOverlay, isCaseOverlayOpen, setIsCaseOverlayOpen,
         <input
           type="text"
           value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
+          onChange={(e) => {
+            setSearchQuery(e.target.value);
+            setSelectedCases([]);
+          }}
           onKeyDown={handleKeyDown}
           placeholder="Search cases..."
           className="flex-1 outline-none text-gray-700 font-medium placeholder-gray-400"

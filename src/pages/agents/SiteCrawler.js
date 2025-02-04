@@ -5,7 +5,7 @@ import useGeminiClient from '../../components/useGeminiClient';
 import { useNavigate } from 'react-router-dom';
 
 // Replace <YOUR_VM_IP> with your backend's public IP address
-const socket = io('http://34.68.45.14:5000');
+const socket = io('http://0.0.0.0:5001');
 
 function SiteCrawlerApp() {
   const [startUrl, setStartUrl] = useState('');
@@ -31,7 +31,7 @@ function SiteCrawlerApp() {
     e.preventDefault();
     try {
       // Submit the crawl request to your backend API
-      const response = await fetch(`http://34.68.45.14:5000/api/crawl`, {
+      const response = await fetch(`http://0.0.0.0:5001/api/crawl`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ startUrl })

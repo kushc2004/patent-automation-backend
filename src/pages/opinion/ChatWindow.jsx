@@ -440,7 +440,7 @@ const ChatWindow = ({ openCaseOverlay, setIsDocumentCollapsed, setActiveChat, ac
             return `Could not retrieve case text for ${caseId}.`;
         }
     };
-
+    
     const fetchCodeText = async (act, section) => {
         try {
             const response = await axios.get(`https://legalai-backend-1.onrender.com/fetch-code-text/${act}/${section.split('(')[0]}`);
