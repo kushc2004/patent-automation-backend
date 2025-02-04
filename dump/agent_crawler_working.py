@@ -37,7 +37,20 @@ class SiteCrawlerAgent:
         """Configure the Gemini LLM client."""
         genai.configure(api_key="AIzaSyBa2Boeqwb-nTZ_6IZxesRbawOBasBQr1E")  # Replace with your actual API key
         self.model = genai.GenerativeModel(
-            model_name="gemini-1.5-flash-latest",
+            model_name="gemini-2.0-flash-exp",
+            generation_config={
+                "temperature": 0.2,
+                "top_p": 0.95,
+                "top_k": 40,
+                "max_output_tokens": 8192,
+                "response_mime_type": "application/json",
+            }
+        )
+    def configure_genai_pro(self):
+        """Configure the Gemini LLM client."""
+        genai.configure(api_key="AIzaSyBa2Boeqwb-nTZ_6IZxesRbawOBasBQr1E")  # Replace with your actual API key
+        self.model = genai.GenerativeModel(
+            model_name="gemini-1.5-pro",
             generation_config={
                 "temperature": 0.2,
                 "top_p": 0.95,
@@ -160,19 +173,20 @@ class SiteCrawlerAgent:
     def get_link_descriptions(self, current_url: str, links: List[Dict[str, str]], page_body: str) -> List[Dict[str, str]]:
         """
         For each candidate link, uses Gemini LLM to generate a concise one-line description.
-        The prompt now includes both the anchor text and a 'context' field (extracted from the nearest parent div)
-        so that the description is based on the entire container.
+        The prompt now includes both the anchor text and a 'context' field (extracted from the nearest parent div
+        and/or nearby header elements) so that the description is based on the entire container.
         Returns the list of links updated with an additional 'description' field.
         """
         prompt = (
-            "You are given a list of candidate links from a webpage. Each link object has the keys 'url', 'text', and 'context'.\n"
-            "The 'text' is the text of the <a> tag, and 'context' is the text from any of it's parent <div>. You need to analyse the whole page to get the context of what the link is relating to.\n"
-            " - Example: The <a> tag text might have written 'continue' but any of its parent <div>s might have more context of the link like 'Tell us about your company', this means that the continue button is for this. To tell more about the company, and it might be a contact us form or anything related."
+            "You are given a list of candidate links from a webpage. Each link object has the keys 'url', 'text', and 'description'.\n"
+            "The 'text' is the title/heading of the link (it might be in any parent div of the <a> tag also), and 'description' is the text from any of its parent containers. "
+            "If the anchor text is generic (like 'continue', 'click', 'read more', etc.), you should use the additional context (analyse the page body again) provided to infer a proper description.\n"
             "Using the provided context, generate a concise one-line description that summarizes what the link likely points to.\n\n"
             "For example:\n"
             "```\n"
             '[{"url": "https://example.com/contact", "description": "Contact us page with support details."}, {"url": "https://example.com/apply", "description": "Founders application form."}]\n'
             "```\n\n"
+            "Content details:\n"
             f"Current URL: {current_url}\n\n"
             f"Candidate links: {json.dumps(links, indent=2)}\n\n"
             "**Page Body Text (truncated):**\n"
@@ -203,6 +217,7 @@ class SiteCrawlerAgent:
 
         # Configure Gemini LLM once at the start
         self.configure_genai()
+        #self.configure_genai_pro()
 
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=True)
@@ -238,7 +253,7 @@ class SiteCrawlerAgent:
 
                 # Extract only the text content of the page body (excluding JS/CSS)
                 try:
-                    page_body = await page.evaluate("() => document.body.innerHTML")
+                    page_body = await page.evaluate("() => document.body.innerText")
                 except Exception as e:
                     page_body = page_content  # Fallback if evaluation fails
 
@@ -258,7 +273,8 @@ class SiteCrawlerAgent:
                         try:
                             href = await anchor.get_attribute("href")
                             anchor_text = (await anchor.inner_text()).strip() or ""
-                            # Get context from the nearest parent <div>
+                            
+                            # Get basic context from the nearest parent <div>
                             context_text = await page.evaluate(
                                 """(element) => {
                                     let parent = element.parentElement;
@@ -270,6 +286,27 @@ class SiteCrawlerAgent:
                                     }
                                     return "";
                                 }""", anchor)
+                            
+                            # If the anchor text is generic, try to extract header information
+                            generic_texts = {"continue", "click", "read more", "learn more"}
+                            if anchor_text.lower() in generic_texts:
+                                heading_text = await page.evaluate(
+                                    """(element) => {
+                                        let parent = element.parentElement;
+                                        while (parent) {
+                                            // Look for header tags within the parent element
+                                            let headers = parent.querySelectorAll("h1, h2, h3, h4, h5, h6");
+                                            if (headers.length > 0) {
+                                                return Array.from(headers).map(h => h.innerText).join(" ");
+                                            }
+                                            parent = parent.parentElement;
+                                        }
+                                        return "";
+                                    }""", anchor)
+                                if heading_text:
+                                    # Prepend the heading text to the context for a richer description.
+                                    context_text = heading_text + " " + context_text
+                            
                             if href:
                                 absolute_url = urljoin(current_url, href)
                                 candidate_links.append({
@@ -303,6 +340,8 @@ class SiteCrawlerAgent:
 
                 # Generate one-line descriptions using only the page body text (excludes JS/CSS)
                 await self.emit_log("Generating one-line descriptions for candidate links.")
+                await self.emit_log(f"\nPage Body: {page_body}\n")
+                
                 described_links = self.get_link_descriptions(current_url, candidate_links, page_body)
                 self.all_candidate_links.extend(described_links)
 

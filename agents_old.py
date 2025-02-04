@@ -10,6 +10,17 @@ import random
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 
+def safe_selector(selector: str) -> str:
+    """
+    If the selector is an ID selector (starts with '#')
+    and the first character of the id is a digit,
+    convert it to an attribute selector.
+    """
+    if selector.startswith("#") and len(selector) > 1 and selector[1].isdigit():
+        # Remove the '#' and wrap in [id="..."]
+        return f'[id="{selector[1:]}"]'
+    return selector
+
 class AutomateSubmissionAgent:
     def __init__(self, socketio: SocketIO, session_id: str, input_data: str, formURL: str):
         self.socketio = socketio
@@ -71,16 +82,15 @@ class AutomateSubmissionAgent:
             await self.emit_log(f"Failed to take screenshot: {str(e)}")
 
     async def stream_screenshots(self):
-        """Streams screenshots from the buffer at ~30fps."""
+        """Streams screenshots from the buffer at ~10fps (adjustable)."""
         try:
             while True:
                 async with self.buffer_lock:
                     if self.screenshot_buffer:
                         screenshot = self.screenshot_buffer.pop(0)
                         self.socketio.emit('process-screenshot', screenshot, room=self.session_id)
-                await asyncio.sleep(1/10)  # ~10fps (adjust as needed)
+                await asyncio.sleep(1/10)
         except asyncio.CancelledError:
-            # Send any remaining screenshots
             async with self.buffer_lock:
                 for screenshot in self.screenshot_buffer:
                     self.socketio.emit('process-screenshot', screenshot, room=self.session_id)
@@ -92,14 +102,14 @@ class AutomateSubmissionAgent:
         try:
             while True:
                 await self.take_screenshot(page, "Continuous capture")
-                await asyncio.sleep(1)  # Capture every second
+                await asyncio.sleep(1)
         except asyncio.CancelledError:
             pass
         except Exception as e:
             await self.emit_log(f"Periodic screenshot error: {str(e)}")
 
     def gemini_client(self, prompt: str, file_paths: List[str] = []) -> str:
-        """Generates content using Gemini LLM."""
+        """Generates content using Gemini LLM. If file_paths are provided, they are uploaded along with the prompt."""
         if file_paths:
             uploaded_files = [genai.upload_file(file) for file in file_paths]
             response = self.model.generate_content([prompt] + uploaded_files)
@@ -120,8 +130,27 @@ class AutomateSubmissionAgent:
         if self.user_input_future and not self.user_input_future.done():
             self.user_input_future.set_result(data)
 
+    async def get_body_without_scripts(self, page: Page) -> str:
+        """Returns document.body.innerHTML with all <script> tags removed."""
+        return await page.evaluate(
+            """() => {
+                   const clone = document.body.cloneNode(true);
+                   const scripts = clone.querySelectorAll('script');
+                   scripts.forEach(s => s.remove());
+                   return clone.innerHTML;
+               }"""
+        )
+
+    # Helper method for Method 1: use built-in timeout for wait_for_selector
+    async def wait_and_fill(self, page: Page, selector: str, fill_func, *args):
+        try:
+            await page.wait_for_selector(selector, state="visible", timeout=20000)
+            await fill_func(page, selector, *args)
+        except Exception:
+            await self.emit_log(f"Field '{selector}' did not become visible within 20 seconds. Skipping.")
+
     async def automate_submission(self):
-        """Performs the automation task for form submission."""
+        """Performs the automation task for multipage form submission."""
         try:
             await self.emit_log('Starting automation process.')
             self.configure_genai()
@@ -130,7 +159,7 @@ class AutomateSubmissionAgent:
             self.streaming_task = asyncio.create_task(self.stream_screenshots())
 
             async with async_playwright() as p:
-                browser = await p.chromium.launch(headless=True)  # Set headless=False to see the browser actions
+                browser = await p.chromium.launch(headless=True)
                 context = await browser.new_context()
                 page = await context.new_page()
                 
@@ -140,213 +169,211 @@ class AutomateSubmissionAgent:
 
                 await self.emit_log('Launching browser...')
                 await self.take_screenshot(page, 'Launching browser.')
-                await asyncio.sleep(1)  # Delay for visibility
+                await asyncio.sleep(1)
 
                 await page.goto(self.form_url)
                 
-                # Now that the form is loaded, start filling it.
-                await self.emit_log('Starting to fill out the form...')
-                await self.take_screenshot(page, 'Form page loaded.')
-                await asyncio.sleep(1)
+                # Loop over the multipage form.
+                while True:
+                    await self.emit_log('Processing a form page...')
+                    await self.take_screenshot(page, 'Form page loaded.')
+                    await asyncio.sleep(1)
 
-                # Analyze the form fields using Gemini LLM
-                await self.emit_log('Analyzing form fields with Gemini LLM...')
-                page_content = await page.content()
-
-                # Note: The prompt now instructs Gemini to account for ALL input types and to only fill startup-related data.
-                prompt = (
-                    "You are provided with the HTML content of a web form and user input data in arbitrary format. "
-                    "Your task is to analyze the HTML and map the startup-related user input data to the form fields. "
-                    "Analyze each input field’s label, name, type, and CSS selector. "
-                    "The form may include any of the following input types: button, checkbox, color, date, datetime-local, email, file, hidden, image, month, number, password, radio, range, reset, search, submit, text, time, url, week, and any textarea or select fields. "
-                    "For each field, determine the correct value that should be filled based on the provided startup data. "
-                    "If any required data is missing from the user input, generate a temporary valid startup placeholder value to allow the form to be submitted successfully. "
-                    "Do not enter any dump values or placeholders that are not related to startups. "
-                    "Also, determine a CSS selector for the submit button and suggest one or more dynamic confirmation strategies "
-                    "(for example, detecting a success message, a URL change, or the absence of the form).\n\n"
-                    "Return the output strictly in the following JSON format:\n"
-                    "```json\n"
-                    "{\n"
-                    "  \"fields\": [\n"
-                    "    {\n"
-                    "      \"label\": \"Full Name\",\n"
-                    "      \"name\": \"name\",\n"
-                    "      \"type\": \"text\",\n"
-                    "      \"selector\": \"#name\",\n"
-                    "      \"value\": \"John Doe\"\n"
-                    "    },\n"
-                    "    {\n"
-                    "      \"label\": \"Email Address\",\n"
-                    "      \"name\": \"email\",\n"
-                    "      \"type\": \"email\",\n"
-                    "      \"selector\": \"#email\",\n"
-                    "      \"value\": \"johndoe@example.com\"\n"
-                    "    }\n"
-                    "    // Add more fields as necessary\n"
-                    "  ],\n"
-                    "  \"submit_button\": {\n"
-                    "    \"text\": \"Submit\",\n"
-                    "    \"selector\": \"button[type='submit']\"\n"
-                    "  },\n"
-                    "  \"confirmation_strategies\": [\n"
-                    "    {\n"
-                    "      \"strategy\": \"success_message\",\n"
-                    "      \"description\": \"Detect a success message with specific text or CSS selector.\"\n"
-                    "    },\n"
-                    "    {\n"
-                    "      \"strategy\": \"url_change\",\n"
-                    "      \"description\": \"Monitor for a change in the URL indicating a new page or a confirmation URL.\"\n"
-                    "    }\n"
-                    "    // Add more strategies as necessary\n"
-                    "  ]\n"
-                    "}\n"
-                    "```\n\n"
-                    f"User Input Data:\n {self.input_data} \n\n"
-                    f"HTML Content:\n{page_content}"
-                )
-
-                lml_response = self.gemini_client(prompt)
-                await self.emit_log('Received response from Gemini LLM.')
-                try:
-                    form_data = json.loads(lml_response)
+                    # Get page content without <script> tags.
+                    page_body = await self.get_body_without_scripts(page)
                     
-                    print("\nform data: ", form_data)
-                    form_fields = form_data.get("fields", [])
-                    submit_button = form_data.get("submit_button", {})
-                    confirmation_strategies = form_data.get("confirmation_strategies", [])
-                    await self.emit_log('Successfully extracted form fields, submit button, and confirmation strategies.')
-                    await self.take_screenshot(page, 'Extracted form details.')
+                    # Before calling Gemini, take a screenshot of the page to attach.
+                    screenshot_file = f"temp_llm_{self.session_id}.png"
+                    screenshot_bytes = await page.screenshot()
+                    with open(screenshot_file, "wb") as f:
+                        f.write(screenshot_bytes)
 
-                    # Emit suggested fields to the frontend
-                    self.socketio.emit('suggested-fields', {
-                        'fields': form_fields,
-                        'confirmation_strategies': confirmation_strategies
+                    # Build prompt and note that a screenshot is attached.
+                    prompt = (
+                        "You are provided with the HTML content of a web form page and user input data in arbitrary format. "
+                        "Your task is to analyze the HTML and map the startup-related user input data to the form fields on this page. "
+                        "Analyze each input field’s label, name, type, and CSS selector. "
+                        "The form may include any of the following input types: button, checkbox, color, date, datetime-local, email, file, hidden, image, month, number, password, radio, range, reset, search, submit, text, time, url, week, as well as any textarea or select fields. "
+                        "For each field, determine the correct value that should be filled based on the provided startup data. "
+                        "If any required data is missing, generate a valid startup-related placeholder value to allow the form to be submitted. "
+                        "Also, determine a CSS selector for the button that either moves to the next page or submits the form, and suggest one or more dynamic confirmation strategies (e.g., detecting a success message, a URL change, or the absence of the form).\n\n"
+                        "Return the output strictly in the following JSON format:\n"
+                        "```json\n"
+                        "{\n"
+                        "  \"fields\": [\n"
+                        "    {\n"
+                        "      \"label\": \"Full Name\",\n"
+                        "      \"name\": \"name\",\n"
+                        "      \"type\": \"text\",\n"
+                        "      \"selector\": \"#name\",\n"
+                        "      \"value\": \"John Doe\"\n"
+                        "    },\n"
+                        "    {\n"
+                        "      \"label\": \"Email Address\",\n"
+                        "      \"name\": \"email\",\n"
+                        "      \"type\": \"email\",\n"
+                        "      \"selector\": \"#email\",\n"
+                        "      \"value\": \"johndoe@example.com\"\n"
+                        "    }\n"
+                        "    // Add more fields as necessary\n"
+                        "  ],\n"
+                        "  \"submit_button\": {\n"
+                        "    \"text\": \"Next\",\n"
+                        "    \"data-qa\": \"start-button\",  \n"
+
+                        "    \"selector\": \"button[type='submit']\"\n"
+                        "  },\n"
+                        "  \"confirmation_strategies\": [\n"
+                        "    {\n"
+                        "      \"strategy\": \"success_message\",\n"
+                        "      \"description\": \"Detect a success message with specific text or CSS selector.\"\n"
+                        "    },\n"
+                        "    {\n"
+                        "      \"strategy\": \"url_change\",\n"
+                        "      \"description\": \"Monitor for a change in the URL indicating navigation.\"\n"
+                        "    }\n"
+                        "    // Add more strategies as necessary\n"
+                        "  ]\n"
+                        "}\n"
+                        "```\n\n"
+                        "Note: A screenshot of the current page has been attached to this prompt for better results.\n\n"
+                        f"User Input Data:\n{self.input_data}\n\n"
+                        f"HTML Content:\n{page_body}"
+                    )
+
+                    lml_response = self.gemini_client(prompt, file_paths=[screenshot_file])
+                    await self.emit_log('Received response from Gemini LLM.')
+                    try:
+                        form_data = json.loads(lml_response)
+                        form_fields = form_data.get("fields", [])
+                        submit_button = form_data.get("submit_button", {})
+                        confirmation_strategies = form_data.get("confirmation_strategies", [])
+                        await self.emit_log('Extracted form fields, submit button, and confirmation strategies.')
+                        await self.take_screenshot(page, 'Extracted form details.')
+
+                        # Emit suggested fields to frontend.
+                        self.socketio.emit('suggested-fields', {
+                            'fields': form_fields,
+                            'confirmation_strategies': confirmation_strategies
+                        }, room=self.session_id)
+                    except json.JSONDecodeError:
+                        await self.emit_log('Failed to parse Gemini LLM response.')
+                        break
+
+                    # Fill out the form fields.
+                    await self.emit_log('Filling out the form fields...')
+                    for field in form_fields:
+                        field_name = field.get('name')
+                        selector = field.get('selector')
+                        field_type = field.get('type')
+                        value = field.get('value', '')
+
+                        if not value:
+                            prompt_msg = f"Please provide a value for the field '{field_name}' ({field.get('label')})."
+                            user_value = await self.prompt_user_for_input(prompt_msg)
+                            value = user_value.get('value', '')
+                            if field_type == 'file':
+                                self.socketio.emit('request-file-upload', {
+                                    'prompt': f"Please upload a file for the field '{field_name}' ({field.get('label')})."
+                                }, room=self.session_id)
+                                file_upload = await self.prompt_user_for_input("file_upload")
+                                file_b64 = file_upload.get('file', '')
+                                file_path = f"temp_{self.session_id}_{field_name}.png"
+                                with open(file_path, "wb") as f:
+                                    f.write(base64.b64decode(file_b64))
+                                value = file_path
+
+                        if field_type in ['text', 'email', 'password', 'textarea']:
+                            await self.wait_and_fill(page, selector, self._smooth_scroll_to_element)
+                            await self.wait_and_fill(page, selector, self._type_with_effect, value)
+                        elif field_type in ['date', 'datetime-local', 'time', 'month', 'week']:
+                            await self.wait_and_fill(page, selector, self._smooth_scroll_to_element)
+                            await self.wait_and_fill(page, selector, page.fill, value)
+                        elif field_type == 'number':
+                            await self.wait_and_fill(page, selector, self._smooth_scroll_to_element)
+                            await self.wait_and_fill(page, selector, page.fill, str(value))
+                        elif field_type == 'range':
+                            await self.wait_and_fill(page, selector, self._smooth_scroll_to_element)
+                            try:
+                                await self.wait_and_fill(
+                                    page, selector,
+                                    page.evaluate,
+                                    """(selector, value) => {
+                                           const input = document.querySelector(selector);
+                                           if(input) {
+                                               input.value = value;
+                                               input.dispatchEvent(new Event('input'));
+                                           }
+                                       }""",
+                                    value
+                                )
+                            except Exception:
+                                await self.emit_log(f"Skipping range field '{field_name}' (selector: {selector}).")
+                        elif field_type in ['color', 'tel', 'url', 'search']:
+                            await self.wait_and_fill(page, selector, self._smooth_scroll_to_element)
+                            await self.wait_and_fill(page, selector, page.fill, value)
+                        elif field_type == 'select':
+                            await self.wait_and_fill(page, selector, self._smooth_scroll_to_element)
+                            await self.wait_and_fill(page, selector, page.select_option, value)
+                        elif field_type in ['checkbox', 'radio']:
+                            await self.wait_and_fill(page, selector, self._smooth_scroll_to_element)
+                            if isinstance(value, bool):
+                                if value:
+                                    await self.wait_and_fill(page, selector, page.check)
+                            elif isinstance(value, str):
+                                if value.lower() in ['true', 'yes', '1', 'done']:
+                                    await self.wait_and_fill(page, selector, page.check)
+                                else:
+                                    await self.emit_log(f"Skipping checkbox/radio '{field_name}' as value '{value}' did not indicate selection.")
+                        elif field_type == 'file':
+                            await self.wait_and_fill(page, selector, self._smooth_scroll_to_element)
+                            await self.wait_and_fill(page, selector, page.set_input_files, value)
+                        elif field_type == 'hidden':
+                            await page.evaluate(
+                                """(selector, value) => {
+                                       const input = document.querySelector(selector);
+                                       if(input) { input.value = value; }
+                                   }""",
+                                selector,
+                                value
+                            )
+                        elif field_type in ['button', 'reset', 'submit', 'image']:
+                            await self.emit_log(f"Skipping field type '{field_type}' for field '{field_name}'.")
+                        else:
+                            await self.wait_and_fill(page, selector, self._smooth_scroll_to_element)
+                            await self.wait_and_fill(page, selector, self._type_with_effect, value)
+
+                        await self.take_screenshot(page, f"Filled field '{field_name}' with value '{value}'.")
+                        await asyncio.sleep(0.5)
+
+                    await self.emit_log('Form fields filled.')
+                    await self.take_screenshot(page, 'Form fields filled.')
+                    await asyncio.sleep(1)
+
+                    filled_form_data = {field["label"]: field.get("value", "") for field in form_fields}
+                    self.socketio.emit("confirm-form-submission", {
+                        "message": "Shall I submit the form on this page with the following details?",
+                        "responses": filled_form_data
                     }, room=self.session_id)
-                except json.JSONDecodeError:
-                    await self.emit_log('Failed to parse Gemini LLM response.')
-                    return
 
-                # Fill out the form based on extracted fields
-                await self.emit_log('Filling out the form fields...')
-                for field in form_fields:
-                    field_name = field.get('name')
-                    selector = field.get('selector')
-                    field_type = field.get('type')
-                    value = field.get('value', '')
+                    user_confirmation = await self.prompt_user_for_input("confirm_submission")
+                    if user_confirmation.get("value", "").lower() != "yes":
+                        await self.emit_log("Submission canceled by user.")
+                        break
 
-                    # If no value was provided, prompt the user.
-                    if not value:
-                        prompt_msg = f"Please provide a value for the field '{field_name}' ({field.get('label')})."
-                        user_value = await self.prompt_user_for_input(prompt_msg)
-                        value = user_value.get('value', '')
-                        # Special handling for file uploads
-                        if field_type == 'file':
-                            self.socketio.emit('request-file-upload', {
-                                'prompt': f"Please upload a file for the field '{field_name}' ({field.get('label')})."
-                            }, room=self.session_id)
-                            file_upload = await self.prompt_user_for_input("file_upload")
-                            file_b64 = file_upload.get('file', '')
-                            file_path = f"temp_{self.session_id}_{field_name}.png"  # Adjust extension as needed
-                            with open(file_path, "wb") as f:
-                                f.write(base64.b64decode(file_b64))
-                            value = file_path
+                    await self.emit_log('Clicking the submit/next button...')
+                    submit_selector = submit_button.get("selector", "button[type='submit']")
+                    submit_text = submit_button.get("text", "").lower()
+                    await page.click(submit_selector)
+                    await self.take_screenshot(page, 'Clicked submit/next button.')
+                    await asyncio.sleep(2)
 
-                    # Use smooth scrolling and type-with-effect functions where appropriate.
-                    if field_type in ['text', 'email', 'password', 'textarea']:
-                        await self._smooth_scroll_to_element(page, selector)
-                        await self._type_with_effect(page, selector, value)
-                    elif field_type in ['date', 'datetime-local', 'time', 'month', 'week']:
-                        await self._smooth_scroll_to_element(page, selector)
-                        await page.fill(selector, value)
-                    elif field_type == 'number':
-                        await self._smooth_scroll_to_element(page, selector)
-                        await page.fill(selector, str(value))
-                    elif field_type == 'range':
-                        await self._smooth_scroll_to_element(page, selector)
-                        # Set the value via JavaScript and trigger an input event
-                        await page.evaluate(
-                            """(selector, value) => {
-                                   const input = document.querySelector(selector);
-                                   if(input) {
-                                       input.value = value;
-                                       input.dispatchEvent(new Event('input'));
-                                   }
-                               }""",
-                            selector,
-                            value
-                        )
-                    elif field_type in ['color', 'tel', 'url', 'search']:
-                        await self._smooth_scroll_to_element(page, selector)
-                        await page.fill(selector, value)
-                    elif field_type == 'select':
-                        await self._smooth_scroll_to_element(page, selector)
-                        await page.select_option(selector, value)
-                    elif field_type in ['checkbox', 'radio']:
-                        await self._smooth_scroll_to_element(page, selector)
-                        # For checkboxes/radios, if the value indicates truthiness (or matches a known positive string), check it.
-                        if isinstance(value, bool):
-                            if value:
-                                await page.check(selector)
-                        elif isinstance(value, str):
-                            if value.lower() in ['true', 'yes', '1', 'done']:
-                                await page.check(selector)
-                            else:
-                                # If the value indicates that this option should not be selected, skip checking.
-                                await self.emit_log(f"Skipping checkbox/radio '{field_name}' as value '{value}' did not indicate selection.")
-                    elif field_type == 'file':
-                        await self._smooth_scroll_to_element(page, selector)
-                        await page.set_input_files(selector, value)  # value should be a file path
-                    elif field_type == 'hidden':
-                        # For hidden fields, set the value using JavaScript if needed.
-                        await page.evaluate(
-                            """(selector, value) => {
-                                   const input = document.querySelector(selector);
-                                   if(input) { input.value = value; }
-                               }""",
-                            selector,
-                            value
-                        )
-                    elif field_type in ['button', 'reset', 'submit', 'image']:
-                        await self.emit_log(f"Skipping field type '{field_type}' for field '{field_name}'.")
+                    if any(keyword in submit_text for keyword in ["next", "continue", "start"]):
+                        await self.emit_log("Navigating to the next page of the form...")
                     else:
-                        # Fallback: attempt to fill using type-with-effect
-                        await self._smooth_scroll_to_element(page, selector)
-                        await self._type_with_effect(page, selector, value)
+                        await self.emit_log("Final submission triggered.")
+                        break
 
-                    await self.take_screenshot(page, f"Filled field '{field_name}' with value '{value}'.")
-                    await asyncio.sleep(0.5)  # Delay for visual effect
-
-                await self.emit_log('Form fields filled.')
-                await self.take_screenshot(page, 'Form fields filled.')
-                await asyncio.sleep(1)
-
-                # Emit filled form responses to frontend before submission.
-                filled_form_data = {field["label"]: field["value"] for field in form_fields}
-                self.socketio.emit("confirm-form-submission", {
-                    "message": "Shall I submit the form with the following details?",
-                    "responses": filled_form_data
-                }, room=self.session_id)
-
-                # Wait for user confirmation.
-                user_confirmation = await self.prompt_user_for_input("confirm_submission")
-                if user_confirmation.get("value", "").lower() != "yes":
-                    await self.emit_log("Submission canceled by user.")
-                    return
-
-                await self.emit_log('Submitting the form...')
-                submit_selector = submit_button.get("selector", "button[type='submit']")
-                await page.click(submit_selector)
-                await self.take_screenshot(page, 'Clicked submit button.')
-                await asyncio.sleep(2)
-                
-                # Generate PDF after submission.
-                pdf_file = await self.generate_pdf(filled_form_data)
-                with open(pdf_file, "rb") as f:
-                    encoded_pdf = base64.b64encode(f.read()).decode('utf-8')
-                self.socketio.emit("download-pdf", {"pdf_data": encoded_pdf, "filename": pdf_file}, room=self.session_id)
-                await self.emit_log("PDF generated and sent to frontend.")
-
-                # Implement dynamic confirmation detection.
                 await self.emit_log('Waiting for confirmation using dynamic strategies...')
                 confirmation_detected = False
                 for strategy in confirmation_strategies:
@@ -376,7 +403,7 @@ class AutomateSubmissionAgent:
                     elif strat_name == "url_change":
                         original_url = page.url
                         try:
-                            await page.wait_for_timeout(5000)  # Wait for potential URL change
+                            await page.wait_for_timeout(5000)
                             new_url = page.url
                             if new_url != original_url:
                                 await self.emit_log(f"URL changed from {original_url} to {new_url}.")
@@ -406,8 +433,14 @@ class AutomateSubmissionAgent:
                     await self.emit_log('Form submitted successfully!')
                     await self.take_screenshot(page, 'Form submitted successfully.')
                 else:
-                    await self.emit_log('Confirmation not detected. Verify submission.')
+                    await self.emit_log('Confirmation not detected. Please verify submission.')
                     await self.take_screenshot(page, 'Confirmation not detected.')
+
+                pdf_file = await self.generate_pdf(filled_form_data)
+                with open(pdf_file, "rb") as f:
+                    encoded_pdf = base64.b64encode(f.read()).decode('utf-8')
+                self.socketio.emit("download-pdf", {"pdf_data": encoded_pdf, "filename": pdf_file}, room=self.session_id)
+                await self.emit_log("PDF generated and sent to frontend.")
 
         except Exception as e:
             await self.emit_log(f"Error occurred: {str(e)}")
@@ -424,9 +457,10 @@ class AutomateSubmissionAgent:
                 except asyncio.CancelledError:
                     pass
             await self.send_complete_video()
-
+            
     async def _smooth_scroll_to_element(self, page: Page, selector: str):
-        """Smoothly scrolls to the specified element."""
+        """Smoothly scrolls to the specified element using a safe selector."""
+        safe_sel = safe_selector(selector)
         try:
             await page.evaluate(
                 """async (selector) => {
@@ -436,19 +470,20 @@ class AutomateSubmissionAgent:
                            await new Promise(resolve => setTimeout(resolve, 500));
                        }
                    }""",
-                selector
+                safe_sel
             )
             await asyncio.sleep(0.3)
         except Exception as e:
             await self.emit_log(f"Error during scrolling: {str(e)}")
 
     async def _type_with_effect(self, page: Page, selector: str, text: str):
-        """Simulates human-like typing with random delays."""
+        """Simulates human-like typing with random delays using a safe selector."""
+        safe_sel = safe_selector(selector)
         try:
-            await page.click(selector)  # Focus the field
+            await page.click(safe_sel)  # Focus the field
             await page.evaluate(
                 f"""() => {{
-                        const element = document.querySelector('{selector}');
+                        const element = document.querySelector('{safe_sel}');
                         if (element) element.value = '';
                    }}"""
             )  # Clear field using JavaScript
@@ -458,7 +493,7 @@ class AutomateSubmissionAgent:
                     await self.take_screenshot(page, "Typing in progress")
         except Exception as e:
             await self.emit_log(f"Error during typing: {str(e)}")
-            await page.fill(selector, text)
+            await page.fill(safe_sel, text)
 
     async def send_complete_video(self):
         """Sends all buffered screenshots as a video after completion."""
