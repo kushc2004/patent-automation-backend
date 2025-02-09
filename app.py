@@ -59,7 +59,8 @@ def submit():
     # Instantiate the agent and start the automation in the background
     agent = AutomateSubmissionAgent(socketio, session_id, input_data, formURL)
     agents_dict[session_id] = agent
-    eventlet.spawn_n(agent.automate_submission)
+    #eventlet.spawn_n(agent.automate_submission)
+    eventlet.spawn_n(asyncio.run, agent.automate_submission())
     return jsonify({'session_id': session_id}), 200
 
 
@@ -76,7 +77,7 @@ def start_crawl():
     agents_dict[session_id] = agent
 
     # Properly schedule the coroutine
-    eventlet.spawn_n(agent.run)
+    eventlet.spawn_n(asyncio.run, agent.run())
 
     return jsonify({'session_id': session_id})
 
