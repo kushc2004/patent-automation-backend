@@ -13,6 +13,9 @@ from agents_old import AutomateSubmissionAgent
 from agent_crawler import SiteCrawlerAgent
 from typing import Dict, Any, List
 
+from werkzeug.serving import WSGIRequestHandler
+
+
 # Load environment variables from .env
 load_dotenv()
 
@@ -36,7 +39,13 @@ print("Server started.")
 # Dictionary to keep track of agents by session_id
 agents_dict: Dict[str, AutomateSubmissionAgent] = {}
 
-
+class CustomWSGIRequestHandler(WSGIRequestHandler):
+    def handle_one_request(self):
+        if self.raw_requestline.startswith(b'PRI * HTTP/2.0'):
+            self.send_error(505, "Invalid HTTP version (2.0)")
+            return
+        super().handle_one_request()
+        
 @app.route('/api/submit', methods=['POST'])
 def submit():
     """Handles form submission requests."""
@@ -50,7 +59,7 @@ def submit():
     # Instantiate the agent and start the automation in the background
     agent = AutomateSubmissionAgent(socketio, session_id, input_data, formURL)
     agents_dict[session_id] = agent
-    eventlet.spawn_n(asyncio.run, agent.automate_submission())
+    eventlet.spawn_n(agent.automate_submission)
     return jsonify({'session_id': session_id}), 200
 
 
@@ -67,7 +76,7 @@ def start_crawl():
     agents_dict[session_id] = agent
 
     # Properly schedule the coroutine
-    eventlet.spawn_n(asyncio.run, agent.run())
+    eventlet.spawn_n(agent.run)
 
     return jsonify({'session_id': session_id})
 
@@ -99,4 +108,4 @@ def handle_user_input_event(data):
 
 
 if __name__ == '__main__':
-    socketio.run(app, host='0.0.0.0', port=5001)
+    socketio.run(app, host='0.0.0.0', port=5000, request_handler=CustomWSGIRequestHandler)
