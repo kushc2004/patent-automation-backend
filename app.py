@@ -23,13 +23,7 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = 'Legal.ai*2024'  # Replace with a strong secret key
 CORS(app, resources={
     r"/*": {
-        "origins": [
-            "http://localhost:3000",
-            "http://localhost:3001",
-            "https://legalai-frontend.onrender.com",
-            "https://banthry.in",
-            "https://www.banthry.in"
-        ]
+        "origins": "*"
     }
 })
 socketio = SocketIO(app, async_mode='eventlet', cors_allowed_origins="*")
@@ -110,5 +104,6 @@ def handle_user_input_event(data):
 
 if __name__ == '__main__':
     #socketio.run(app, host='0.0.0.0', port=5000)
-    socketio.run(app, host='0.0.0.0', port=5000, ssl_context=('cert.pem', 'key.pem'))
+    #socketio.run(app, host='0.0.0.0', port=5000, ssl_context=('cert.pem', 'key.pem'))
+    socketio.run(app, host='0.0.0.0', port=5000, ssl_context='adhoc')
 
